@@ -165,25 +165,25 @@ export default function LoginModal() {
   }
 
   const inputCls =
-    'w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-black';
+    'w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-base text-gray-900 placeholder:text-gray-400 outline-none transition focus:border-black focus:ring-2 focus:ring-black/10';
   const btnCls =
-    'w-full rounded-lg bg-black text-white font-medium py-2.5 hover:bg-gray-800 disabled:opacity-60';
+    'w-full rounded-xl bg-black py-3 text-base font-semibold text-white transition hover:bg-gray-800 disabled:opacity-60';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-md rounded-xl bg-white p-6 relative">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+      <div className="relative w-full max-w-lg rounded-2xl bg-white p-8 shadow-2xl">
         <button
           type="button"
           onClick={closeLogin}
           aria-label="Close"
-          className="absolute right-4 top-4 text-gray-400 hover:text-gray-700"
+          className="absolute right-5 top-5 flex size-8 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-700"
         >
           ✕
         </button>
 
         {mode === 'login' ? (
-          <form onSubmit={handleLogin} className="grid gap-4">
-            <h2 className="text-xl font-semibold text-gray-900">Log in</h2>
+          <form onSubmit={handleLogin} className="grid gap-5">
+            <h2 className="text-2xl font-semibold tracking-tight text-gray-900">Log in</h2>
             <input
               className={inputCls}
               type="email"
@@ -204,7 +204,7 @@ export default function LoginModal() {
             <button className={btnCls} type="submit">
               Log in
             </button>
-            <p className="text-sm text-gray-500 text-center">
+            <p className="text-center text-sm text-gray-500">
               No account?{' '}
               <button
                 type="button"
@@ -214,7 +214,7 @@ export default function LoginModal() {
                 Sign up
               </button>
             </p>
-            <p className="text-sm text-gray-500 text-center">
+            <p className="text-center text-sm text-gray-500">
               <button
                 type="button"
                 className="underline"
@@ -225,8 +225,8 @@ export default function LoginModal() {
             </p>
           </form>
         ) : mode === 'forgot' ? (
-          <form onSubmit={handleForgot} className="grid gap-4">
-            <h2 className="text-xl font-semibold text-gray-900">Forgot password</h2>
+          <form onSubmit={handleForgot} className="grid gap-5">
+            <h2 className="text-2xl font-semibold tracking-tight text-gray-900">Forgot password</h2>
             <p className="text-sm text-gray-500">
               Enter your email and we&apos;ll help you reset your password.
             </p>
@@ -242,7 +242,7 @@ export default function LoginModal() {
             <button className={btnCls} type="submit">
               Send reset link
             </button>
-            <p className="text-sm text-gray-500 text-center">
+            <p className="text-center text-sm text-gray-500">
               <button
                 type="button"
                 className="text-black font-medium underline"
@@ -253,8 +253,8 @@ export default function LoginModal() {
             </p>
           </form>
         ) : step === 'form' ? (
-          <form onSubmit={handleSendOtp} className="grid gap-4">
-            <h2 className="text-xl font-semibold text-gray-900">Create account</h2>
+          <form onSubmit={handleSendOtp} className="grid gap-5">
+            <h2 className="text-2xl font-semibold tracking-tight text-gray-900">Create account</h2>
             <input
               className={inputCls}
               type="text"
@@ -283,7 +283,7 @@ export default function LoginModal() {
             <button className={btnCls} disabled={busy} type="submit">
               {busy ? 'Sending code…' : 'Send verification code'}
             </button>
-            <p className="text-sm text-gray-500 text-center">
+            <p className="text-center text-sm text-gray-500">
               Have an account?{' '}
               <button
                 type="button"
@@ -298,8 +298,8 @@ export default function LoginModal() {
             </p>
           </form>
         ) : (
-          <form onSubmit={handleVerifyOtp} className="grid gap-4">
-            <h2 className="text-xl font-semibold text-gray-900">Enter verification code</h2>
+          <form onSubmit={handleVerifyOtp} className="grid gap-5">
+            <h2 className="text-2xl font-semibold tracking-tight text-gray-900">Enter verification code</h2>
             <p className="text-sm text-gray-500">
               We sent a 6-digit code to <strong>{pending?.email}</strong>.
             </p>
