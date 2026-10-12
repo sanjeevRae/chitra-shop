@@ -218,12 +218,16 @@ export default function Header() {
         </p>
       ) : null}
       <div className="hidden sm:block order-3 sm:absolute sm:right-4 lg:right-6 xl:right-8">
-        <a className="flex gap-2 text-sm items-center font-medium text-gray-900" href="/">
+        <button
+          type="button"
+          onClick={openLogin}
+          className="flex gap-2 text-sm items-center font-medium text-gray-900 cursor-pointer"
+        >
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20" fill="none">
             <path fillRule="evenodd" clipRule="evenodd" d="M10.3289 3.875C11.6009 3.87514 12.6316 4.90664 12.6316 6.17871C12.6315 7.45067 11.6008 8.48131 10.3289 8.48145C9.05679 8.48145 8.0253 7.45075 8.02516 6.17871C8.02516 4.90655 9.05671 3.875 10.3289 3.875ZM10.3289 9.98145C12.4293 9.98131 14.1315 8.2791 14.1316 6.17871C14.1316 4.07821 12.4293 2.37514 10.3289 2.375C8.22828 2.375 6.52516 4.07812 6.52516 6.17871C6.5253 8.27918 8.22836 9.98145 10.3289 9.98145ZM15.9504 16.7449V17.033C15.9504 17.4472 16.2862 17.783 16.7004 17.783C17.1145 17.7828 17.4504 17.4471 17.4504 17.033V16.7449C17.4504 13.5889 14.8915 11.03 11.7356 11.03H8.9231C5.76714 11.03 3.20825 13.5889 3.20825 16.7449V17.033C3.20825 17.4472 3.54404 17.783 3.95825 17.783C4.37247 17.783 4.70825 17.4472 4.70825 17.033V16.7449C4.70825 14.4174 6.59557 12.53 8.9231 12.53H11.7356C14.0631 12.53 15.9504 14.4174 15.9504 16.7449Z" fill="currentColor" />
           </svg>
           Sign In / Register
-        </a>
+        </button>
       </div>
     </div>
   </div>

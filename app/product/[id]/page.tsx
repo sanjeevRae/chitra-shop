@@ -1,4 +1,6 @@
 import { notFound } from 'next/navigation';
+import { cache } from 'react';
+import type { Metadata } from 'next';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import type { Product } from '@/lib/products';
 import { parseDbReviews, parseDbSpecs } from '@/lib/product-fields';
@@ -107,7 +109,7 @@ function supabaseRowToProduct(id: string, row: Record<string, unknown>): Product
   };
 }
 
-async function getLiveProduct(id: string): Promise<Product | null> {
+const getLiveProduct = cache(async function getLiveProduct(id: string): Promise<Product | null> {
   try {
     const supabase = getSupabaseAdmin();
     const { data, error } = await supabase.from('product').select('*').eq('product_id', id).maybeSingle();
@@ -150,6 +152,63 @@ async function getLiveProduct(id: string): Promise<Product | null> {
     /* database unreachable — treat as missing so the route 404s */
   }
   return null;
+});
+
+// Social sharing (Open Graph / Twitter) — per-product preview card.
+// WhatsApp/Facebook read these so a shared product link shows the product
+// image + name + price. metadataBase in the root layout resolves relative URLs.
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://chitratech.com.np').replace(/\/$/, '');
+const DEFAULT_OG = `${SITE_URL}/images/logo/logo.png`;
+
+function absoluteUrl(url: string): string {
+  const value = (url || '').trim();
+  if (!value) return DEFAULT_OG;
+  if (/^https?:\/\//i.test(value)) return value;
+  return `${SITE_URL}${value.startsWith('/') ? '' : '/'}${value}`;
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const product = await getLiveProduct(id);
+  const url = `${SITE_URL}/product/${id}`;
+
+  if (!product) {
+    return {
+      title: 'Product not found | Chitra Tech',
+      alternates: { canonical: url },
+      openGraph: { title: 'Product not found', images: [{ url: DEFAULT_OG }] },
+    };
+  }
+
+  const title = product.name || 'Product';
+  const blurb =
+    (product.description || '').replace(/\s+/g, ' ').trim().slice(0, 155) ||
+    `Buy ${title} at Chitra Tech. Fast delivery across Nepal.`;
+  const image = absoluteUrl(product.image);
+
+  return {
+    title,
+    description: blurb,
+    alternates: { canonical: url },
+    openGraph: {
+      type: 'website',
+      siteName: 'Chitra Tech',
+      title,
+      description: blurb,
+      url,
+      images: [{ url: image, alt: title }],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description: blurb,
+      images: [image],
+    },
+  };
 }
 
 export default async function ProductPage({
