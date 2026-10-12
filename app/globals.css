@@ -1,0 +1,27 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-dm-sans), "DM Sans", ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Minimal swiper layout equivalent: the original template ships swiper CSS;
+   these rules reproduce the captured slider geometry (inline slide widths
+   are preserved from the capture). */
+.swiper {
+  overflow: hidden;
+}
+.swiper-wrapper {
+  display: flex;
+}
+.swiper-slide {
+  flex-shrink: 0;
+}
+
+/* Inactive product thumbnails are dimmed on the original template
+   (swiper watch-progress behavior); the active thumb is full opacity. */
+.productThumbSwiper .swiper-slide {
+  opacity: 0.6;
+}
+.productThumbSwiper .swiper-slide-thumb-active {
+  opacity: 1;
+}
