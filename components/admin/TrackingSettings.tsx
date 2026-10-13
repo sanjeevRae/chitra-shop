@@ -258,13 +258,18 @@ export default function TrackingSettings({ token }: { token: string }) {
           <p className="mt-4 text-sm font-normal normal-case text-[#555]">
             Events Manager:{' '}
             <a
-              href="https://business.facebook.com/events_manager2/list/pixel"
+              href="https://business.facebook.com/adsmanager/events_manager"
               target="_blank"
               rel="noopener noreferrer"
               className="font-semibold text-[#111] underline underline-offset-2 hover:text-[#8f1f35]"
             >
-              business.facebook.com/events_manager2
+              business.facebook.com → Events Manager
             </a>
+          </p>
+          <p className="mt-3 text-xs font-normal normal-case leading-5 text-[#777]">
+            Tip: Meta links only open when you are logged into the Facebook account that owns the
+            ad account. If a link shows “page can’t be found”, open business.facebook.com first,
+            switch to the right Business account, then go to Events Manager → Test events.
           </p>
           <p className="mt-3 text-xs font-normal normal-case leading-5 text-[#777]">
             The Pixel ID is public configuration (the browser must load it), so it is stored in the
