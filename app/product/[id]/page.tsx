@@ -170,7 +170,7 @@ const getLiveProduct = cache(async function getLiveProduct(id: string): Promise<
 // Social sharing (Open Graph / Twitter) — per-product preview card.
 // WhatsApp/Facebook read these so a shared product link shows the product
 // image + name + price. metadataBase in the root layout resolves relative URLs.
-const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://chitratech.com.np').replace(/\/$/, '');
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://shop.chitratech.com.np').replace(/\/$/, '');
 const DEFAULT_OG = `${SITE_URL}/images/logo/logo.png`;
 
 function absoluteUrl(url: string): string {

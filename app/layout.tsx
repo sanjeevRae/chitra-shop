@@ -9,7 +9,7 @@ const dmSans = DM_Sans({ subsets: ['latin'], variable: '--font-dm-sans' });
 
 // Social sharing (Open Graph / Twitter). WhatsApp, Facebook, Messenger etc.
 // read these tags to build the link preview card.
-const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://chitratech.com.np').replace(/\/$/, '');
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://shop.chitratech.com.np').replace(/\/$/, '');
 const SITE_NAME = 'Chitra Tech';
 const OG_IMAGE = `${SITE_URL}/images/logo/logo.png`;
 const SITE_DESCRIPTION =
