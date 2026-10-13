@@ -248,12 +248,25 @@ export default function Home() {
   const [categories, setCategories] = useState<{ id: string; name: string; image: string; href: string }[]>([]);
   const [visibleCategoryRows, setVisibleCategoryRows] = useState(2);
   const [categoryCols, setCategoryCols] = useState(7);
+  const [initialCategoryRows, setInitialCategoryRows] = useState(2);
 
   useEffect(() => {
-    const updateCategoryCols = () => {
-      setCategoryCols(window.innerWidth < 1024 ? 4 : 7);
+    // Set the initial visible rows once per breakpoint: mobile shows 3 rows of
+    // 3 (= 9 cards), tablet/desktop show 2 rows. Only set on mount so resizing
+    // never stomps a user's "Show more" expansion.
+    const startCategoryLayout = () => {
+      const w = window.innerWidth;
+      const cols = w < 640 ? 3 : w < 1024 ? 4 : 7;
+      const rows = w < 640 ? 3 : 2;
+      setCategoryCols(cols);
+      setInitialCategoryRows(rows);
+      setVisibleCategoryRows(rows);
     };
-    updateCategoryCols();
+    const updateCategoryCols = () => {
+      const w = window.innerWidth;
+      setCategoryCols(w < 640 ? 3 : w < 1024 ? 4 : 7);
+    };
+    startCategoryLayout();
     window.addEventListener('resize', updateCategoryCols);
     return () => window.removeEventListener('resize', updateCategoryCols);
   }, []);
@@ -531,7 +544,7 @@ export default function Home() {
               </h2>
             </div>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4">
+          <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-4">
             {categories.slice(0, visibleCategoryRows * categoryCols).map(category => (
               <a
                 key={category.id}
@@ -541,7 +554,7 @@ export default function Home() {
                 <span className="mb-4 flex aspect-square w-full items-center justify-center overflow-hidden rounded-xl bg-gray-100">
                   <img className="h-full w-full object-cover" alt={category.name} src={category.image} />
                 </span>
-                <span className="line-clamp-2 text-base font-semibold leading-snug text-gray-900 transition-colors group-hover:text-teal-600">
+                <span className="line-clamp-2 text-base font-medium leading-snug text-gray-900 transition-colors sm:font-semibold group-hover:text-teal-600">
                   {category.name}
                 </span>
                 
@@ -557,10 +570,10 @@ export default function Home() {
                 Show more
               </button>
             </div>
-          ) : visibleCategoryRows > 2 ? (
+          ) : visibleCategoryRows > initialCategoryRows ? (
             <div className="mt-10 flex justify-center">
               <button
-                onClick={() => setVisibleCategoryRows(2)}
+                onClick={() => setVisibleCategoryRows(initialCategoryRows)}
                 className="inline-flex items-center justify-center rounded-lg border border-teal-600 px-4 py-2.5 text-teal-700 font-medium transition hover:bg-teal-50"
               >
                 Show less
