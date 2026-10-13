@@ -60,7 +60,38 @@ export default function FlashSellPage() {
       try {
         const res = await fetch(`/api/storefront?action=featured&path=${encodeURIComponent(FEATURED_PATH)}`);
         const data = await res.json().catch(() => ({}));
-        const next = pickFlashSell(Array.isArray(data.items) ? data.items : []);
+        let next = pickFlashSell(Array.isArray(data.items) ? data.items : []);
+        // Featured rows saved before the picker snapshotted price carry
+        // price=0. Hydrate live prices from the product table in one narrow
+        // lookup so old rows heal without a re-save.
+        const missing = next.filter((item) => !(item.price > 0)).map((item) => item.id);
+        if (missing.length > 0) {
+          try {
+            const priceRes = await fetch(`/api/shop/products?ids=${encodeURIComponent(missing.join(','))}`);
+            const priceData = await priceRes.json().catch(() => ({}));
+            const byId = new Map<string, { id?: string; price?: number; originalPrice?: number; image?: string; name?: string }>(
+              (Array.isArray(priceData.products) ? priceData.products : []).map(
+                (row: { id?: string; price?: number; originalPrice?: number; image?: string; name?: string }) => [
+                  String(row?.id ?? ''),
+                  row,
+                ],
+              ),
+            );
+            next = next.map((item) => {
+              const live = byId.get(item.id);
+              if (!live) return item;
+              return {
+                ...item,
+                price: item.price > 0 ? item.price : Number(live.price ?? 0),
+                originalPrice: item.originalPrice ?? (typeof live.originalPrice === 'number' ? live.originalPrice : undefined),
+                image: item.image || String(live.image ?? ''),
+                name: item.name || String(live.name ?? item.id),
+              };
+            });
+          } catch {
+            /* keep the snapshot values */
+          }
+        }
         if (!cancelled) setProducts(next);
       } catch {
         if (!cancelled) setProducts([]);
