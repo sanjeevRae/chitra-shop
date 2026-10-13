@@ -328,7 +328,7 @@ export default function CheckoutPage() {
                           <div className="absolute right-3 top-2.5 flex gap-1">
                             <img className="h-5" alt="Visa" src="/images/payment/visa.png" />
                             <img className="h-5" alt="Mastercard" src="/images/payment/mastercard.png" />
-                            <img className="h-5" alt="Amex" src="/images/payment/amex.png" />
+                            <img className="h-5" alt="Amex" src="/images/payment/ae-1.png" />
                           </div>
                         </div>
                         <div className="flex divide-x divide-gray-300">

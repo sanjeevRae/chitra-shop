@@ -112,19 +112,32 @@ function supabaseRowToProduct(id: string, row: Record<string, unknown>): Product
 const getLiveProduct = cache(async function getLiveProduct(id: string): Promise<Product | null> {
   try {
     const supabase = getSupabaseAdmin();
-    const { data, error } = await supabase.from('product').select('*').eq('product_id', id).maybeSingle();
+    // Fetch the product and its live reviews in parallel — they're independent,
+    // so this turns two sequential round trips into one. Also select only the
+    // columns this page actually renders: `select('*')` additionally pulled the
+    // heavy search columns (notably the 384-dim `embedding` vector plus
+    // `search_vector`/`search_text`/`name_norm`), bloating every payload.
+    const [productRes, reviewRes] = await Promise.all([
+      supabase
+        .from('product')
+        .select(
+          'name, main_image_url, price, original_price, rating, review_count, stock, description, information, seo_description, brand, category, color, size, specifications, gallery_images_url, reviews',
+        )
+        .eq('product_id', id)
+        .maybeSingle(),
+      // Live customer reviews from the reviews table (newest first). This is the
+      // real source; the product.reviews JSONB column is only a fallback for
+      // admin-entered testimonials when no live reviews exist yet.
+      supabase
+        .from('reviews')
+        .select('rating, text, user_name, user_photo, created_at')
+        .eq('product_id', id)
+        .order('created_at', { ascending: false }),
+    ]);
+    const { data, error } = productRes;
     if (error || !data) return null;
     const row = data as Record<string, unknown>;
-
-    // Live customer reviews from the reviews table (newest first). This is the
-    // real source; the product.reviews JSONB column is only a fallback for
-    // admin-entered testimonials when no live reviews exist yet.
-    const { data: reviewRows } = await supabase
-      .from('reviews')
-      .select('rating, text, user_name, user_photo, created_at')
-      .eq('product_id', id)
-      .order('created_at', { ascending: false });
-    const liveReviews = (reviewRows ?? [])
+    const liveReviews = (reviewRes.data ?? [])
       .map(item => ({
         text: String(item.text ?? '').trim(),
         name: String(item.user_name ?? '').trim() || 'Verified buyer',

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
+import { useRouter } from 'next/navigation';
 import type { Product } from '@/lib/products';
 import { useStore } from '@/lib/store';
 import ProductPrice from '@/components/ProductPrice';
@@ -94,6 +95,7 @@ const ZOOM_MIN_FACTOR = 2;
 
 export default function ProductDetail({ product }: { product: Product }) {
   const { addToCart, toggleWishlist, isWishlisted } = useStore();
+  const router = useRouter();
   const [qty, setQty] = useState(1);
   const [activeSlide, setActiveSlide] = useState(0);
   const [tab, setTab] = useState<TabId>('spec');
@@ -190,7 +192,7 @@ export default function ProductDetail({ product }: { product: Product }) {
   const gallery = (
     galleryImages.length > 0
       ? galleryImages.slice(0, 4)
-      : ['/images/product-slider/lg-1.png']
+      : ['/images/product-slider/lg-2.png']
   ).map((image, index) => ({
     large: image,
     thumb: image,
@@ -441,8 +443,17 @@ export default function ProductDetail({ product }: { product: Product }) {
                       </button>
                     </div>
                     <button
+                      onClick={() => {
+                        addToCart(product.id, qty);
+                        router.push('/checkout');
+                      }}
+                      className="inline-flex grow justify-center text-base leading-5 cursor-pointer focus:ring-3 focus:ring-gray-500/20 items-center bg-black transition hover:bg-gray-800 py-2.5 px-3.5 rounded-lg text-white font-medium"
+                    >
+                      Buy Now
+                    </button>
+                    <button
                       onClick={() => addToCart(product.id, qty)}
-                      className="inline-flex grow justify-center text-base leading-5 cursor-pointer focus:ring-3 focus:ring-violet-500/20 items-center bg-violet-500 transition hover:bg-violet-600 py-2.5 px-3.5 rounded-lg text-white font-medium"
+                      className="inline-flex grow justify-center text-base leading-5 cursor-pointer focus:ring-3 focus:ring-teal-500/20 items-center bg-teal-600 transition hover:bg-teal-700 py-2.5 px-3.5 rounded-lg text-white font-medium"
                     >
                       Add to Cart
                     </button>
