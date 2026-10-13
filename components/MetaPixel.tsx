@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import {
+  dropQueuedEvents,
+  flushQueuedEvents,
   initMetaPixel,
   loadPixelConfig,
   trackPageViewOnce,
@@ -24,7 +26,17 @@ export default function MetaPixel() {
       try {
         const config = await loadPixelConfig();
         if (cancelled) return;
-        if (initMetaPixel(config)) setReady(true);
+        if (initMetaPixel(config)) {
+          // Meta's base-snippet order, in one tick: fbq('init', ID) happened
+          // inside initMetaPixel, then PageView, then any events that fired
+          // while the config was still loading. The [ready, pathname] effect
+          // below re-runs this idempotently (path already recorded).
+          trackPageViewOnce(pathRef.current);
+          flushQueuedEvents();
+          setReady(true);
+        } else {
+          dropQueuedEvents();
+        }
       } catch {
         /* offline / unreachable — pixel stays off */
       }

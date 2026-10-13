@@ -77,34 +77,47 @@ function clearPendingPurchase(): void {
 // safe via the fired-id list in localStorage; the order id doubles as the
 // Meta eventID so a future Conversions API dedupes cleanly). Only payload
 // facts from the backend order row are sent — never customer PII.
+// In-flight guard: two concurrent firePendingPurchase() calls (React
+// StrictMode double-effect in dev, or an inline confirmation racing a
+// confirmation-page mount) can both pass the fired-check across the await gap
+// before either marks the order. An order id already being recorded is
+// skipped outright; the in-flight owner completes the single fire.
+const firingOrderIds = new Set<string>();
+
 export async function firePendingPurchase(): Promise<boolean> {
   try {
     const pending = readPendingPurchase();
     if (!pending) return false;
-    const config = await loadPixelConfig();
-    if (!initMetaPixel(config)) {
+    if (firingOrderIds.has(pending.orderId)) return false;
+    firingOrderIds.add(pending.orderId);
+    try {
+      const config = await loadPixelConfig();
+      if (!initMetaPixel(config)) {
+        clearPendingPurchase();
+        return false;
+      }
+      if (readFiredOrderIds().includes(pending.orderId)) {
+        clearPendingPurchase();
+        return false;
+      }
+      markOrderFired(pending.orderId);
+      trackMetaEvent(
+        'Purchase',
+        {
+          content_ids: pending.contents.map((item) => item.id),
+          content_type: 'product',
+          contents: pending.contents,
+          num_items: pending.numItems,
+          value: pending.total,
+          currency: PIXEL_CURRENCY,
+        },
+        { eventID: pending.orderId },
+      );
       clearPendingPurchase();
-      return false;
+      return true;
+    } finally {
+      firingOrderIds.delete(pending.orderId);
     }
-    if (readFiredOrderIds().includes(pending.orderId)) {
-      clearPendingPurchase();
-      return false;
-    }
-    markOrderFired(pending.orderId);
-    trackMetaEvent(
-      'Purchase',
-      {
-        content_ids: pending.contents.map((item) => item.id),
-        content_type: 'product',
-        contents: pending.contents,
-        num_items: pending.numItems,
-        value: pending.total,
-        currency: PIXEL_CURRENCY,
-      },
-      { eventID: pending.orderId },
-    );
-    clearPendingPurchase();
-    return true;
   } catch {
     return false;
   }

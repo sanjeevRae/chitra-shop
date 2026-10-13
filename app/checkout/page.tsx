@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useStore } from '@/lib/store';
 import { useCustomerAuth } from '@/lib/customer-context';
-import { getProductWithPlaceholder } from '@/lib/products';
+import { getProduct, getProductWithPlaceholder } from '@/lib/products';
 import { PIXEL_CURRENCY, trackMetaEvent } from '@/lib/meta-pixel';
 import { rememberPurchase, type PendingPurchase } from '@/lib/meta-purchase';
 
@@ -19,7 +19,7 @@ function money(n: number): string {
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { cart, cartSubtotal, clearCart } = useStore();
+  const { cart, cartSubtotal, clearCart, cartProducts } = useStore();
   const { user, openLogin, authHeaders } = useCustomerAuth();
   const [placing, setPlacing] = useState(false);
   const [checkoutError, setCheckoutError] = useState('');
@@ -32,14 +32,21 @@ export default function CheckoutPage() {
   // on login would under-report; checkout beginning = cart review here.
   const initiatedRef = useRef(false);
   useEffect(() => {
+    // Same price resolution as the store's cartSubtotal (DB row, then static
+    // catalog). Lines with no price yet mean the cart is still hydrating —
+    // hold the event (ref not yet set) so the next render can retry with
+    // real prices instead of permanently skipping this visit.
     if (initiatedRef.current || cart.length === 0) return;
-    initiatedRef.current = true;
     const contents = cart.flatMap((line) => {
-      const product = getProductWithPlaceholder(line.id);
-      if (!product) return [];
-      return [{ id: String(line.id), quantity: line.qty, item_price: product.price }];
+      const live = cartProducts[String(line.id)];
+      const product = live ?? getProduct(line.id);
+      const itemPrice = Number(product?.price ?? 0) || 0;
+      if (!product || itemPrice <= 0) return [];
+      return [{ id: String(line.id), quantity: line.qty, item_price: itemPrice }];
     });
+    if (contents.length !== cart.length) return;
     if (contents.length === 0) return;
+    initiatedRef.current = true;
     trackMetaEvent('InitiateCheckout', {
       content_ids: contents.map((item) => item.id),
       content_type: 'product',
@@ -48,7 +55,7 @@ export default function CheckoutPage() {
       value: Math.round(total * 100) / 100,
       currency: PIXEL_CURRENCY,
     });
-  }, [cart, itemCount, total]);
+  }, [cart, cartProducts, itemCount, total]);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();

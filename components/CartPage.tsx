@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { MapPin, Minus, Plus, ShieldCheck, Trash2 } from 'lucide-react';
 import { useStore } from '../lib/store';
@@ -72,6 +72,10 @@ export default function CartPage() {
   const [formError, setFormError] = useState('');
   const [checkoutStatus, setCheckoutStatus] = useState('');
   const [placedOrder, setPlacedOrder] = useState<PlacedOrder | null>(null);
+  // Meta InitiateCheckout once-guard: stepping back to the cart and clicking
+  // through again must not re-count the same initiation. Keyed by cart
+  // composition so a genuinely changed cart still records a new initiation.
+  const initiatedSigRef = useRef<string>('');
 
   // Prefill the address from the account once it loads (or becomes available).
   useEffect(() => {
@@ -119,22 +123,32 @@ export default function CartPage() {
     }
     if (!cart.length) return;
     // Meta InitiateCheckout: validation above passed, so the customer is
-    // genuinely beginning checkout (never on a failed attempt).
+    // genuinely beginning checkout (never on a failed attempt). Every line
+    // must resolve to a real product — an unresolved line means cart pricing
+    // is still hydrating, so hold the event rather than send value 0.
     const contents = cart.flatMap((line) => {
       const product = resolveProduct(line.id);
       if (!product) return [];
       const itemPrice = Number(product.price ?? 0) || 0;
+      if (itemPrice <= 0) return [];
       return [{ id: String(line.id), quantity: line.qty, item_price: itemPrice }];
     });
+    if (contents.length !== cart.length) return;
     if (contents.length > 0) {
-      trackMetaEvent('InitiateCheckout', {
-        content_ids: contents.map((item) => item.id),
-        content_type: 'product',
-        contents,
-        num_items: totalItems,
-        value: Math.round(cartSubtotal * 100) / 100,
-        currency: PIXEL_CURRENCY,
-      });
+      // Once per distinct cart composition (also prevents queueing a duplicate
+      // while the pixel is still loading — the queue itself has no dedupe).
+      const signature = contents.map((item) => `${item.id}x${item.quantity}`).join('|');
+      if (initiatedSigRef.current !== signature) {
+        initiatedSigRef.current = signature;
+        trackMetaEvent('InitiateCheckout', {
+          content_ids: contents.map((item) => item.id),
+          content_type: 'product',
+          contents,
+          num_items: totalItems,
+          value: Math.round(cartSubtotal * 100) / 100,
+          currency: PIXEL_CURRENCY,
+        });
+      }
     }
     setStep('checkout');
     window.scrollTo({ top: 0, behavior: 'smooth' });
