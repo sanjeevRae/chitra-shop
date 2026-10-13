@@ -119,7 +119,7 @@ export default function FlashSellPage() {
               </p>
             </div>
             <div className="flex sm:justify-end">
-              <a className="inline-flex items-center justify-center rounded-lg border border-violet-500 px-4 py-2.5 text-violet-600 font-medium transition hover:bg-violet-50" href="/">
+              <a className="inline-flex items-center justify-center rounded-lg border border-teal-500 px-4 py-2.5 text-teal-600 font-medium transition hover:bg-teal-50" href="/">
                 Back to Home
               </a>
             </div>

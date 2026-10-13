@@ -50,7 +50,7 @@ export default function ThankYouPage() {
           </div>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <a
-              className="inline-flex items-center justify-center rounded-lg bg-violet-500 px-6 py-3 text-white font-medium transition hover:bg-violet-600"
+              className="inline-flex items-center justify-center rounded-lg bg-teal-500 px-6 py-3 text-white font-medium transition hover:bg-teal-600"
               href="/shop"
             >
               Continue Shopping

@@ -531,18 +531,21 @@ export default function Home() {
               </h2>
             </div>
           </div>
-          <div className="grid grid-cols-4 sm:grid-cols-4 lg:grid-cols-7 gap-y-11 gap-x-6 items-stretch rounded-[18px] bg-gray-50 p-4 sm:p-6">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4">
             {categories.slice(0, visibleCategoryRows * categoryCols).map(category => (
-              <article key={category.id} className="flex h-full flex-col items-center gap-5 text-center group">
-                <a className="flex aspect-square w-full items-center justify-center overflow-hidden bg-white rounded-[18px]" href={category.href}>
+              <a
+                key={category.id}
+                href={category.href}
+                className="group flex h-full flex-col rounded-2xl border border-gray-200 bg-white p-3 transition hover:border-gray-300 hover:shadow-lg"
+              >
+                <span className="mb-4 flex aspect-square w-full items-center justify-center overflow-hidden rounded-xl bg-gray-100">
                   <img className="h-full w-full object-cover" alt={category.name} src={category.image} />
-                </a>
-                <h3 className="flex min-h-12 items-start justify-center text-gray-800 font-medium text-base group-hover:text-teal-600 transition-colors">
-                  <a className="line-clamp-2" href={category.href}>
-                    {category.name}
-                  </a>
-                </h3>
-              </article>
+                </span>
+                <span className="line-clamp-2 text-base font-semibold leading-snug text-gray-900 transition-colors group-hover:text-teal-600">
+                  {category.name}
+                </span>
+                
+              </a>
             ))}
           </div>
           {categories.length > visibleCategoryRows * categoryCols ? (

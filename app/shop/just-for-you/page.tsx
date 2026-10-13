@@ -85,7 +85,7 @@ export default function JustForYouPage() {
               </p>
             </div>
             <div className="flex sm:justify-end">
-              <a className="inline-flex items-center justify-center rounded-lg border border-violet-500 px-4 py-2.5 text-violet-600 font-medium transition hover:bg-violet-50" href="/">
+              <a className="inline-flex items-center justify-center rounded-lg border border-teal-500 px-4 py-2.5 text-teal-600 font-medium transition hover:bg-teal-50" href="/">
                 Back to Home
               </a>
             </div>
@@ -121,7 +121,7 @@ export default function JustForYouPage() {
                   <button
                     onClick={handleViewMore}
                     disabled={loadingMore}
-                    className="inline-flex items-center justify-center rounded-lg bg-violet-500 px-8 py-2.5 text-white font-medium transition hover:bg-violet-600 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex items-center justify-center rounded-lg bg-teal-500 px-8 py-2.5 text-white font-medium transition hover:bg-teal-600 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {loadingMore ? 'Loading…' : 'View More'}
                   </button>
