@@ -8,6 +8,7 @@ import CartDrawer from './CartDrawer';
 import CartNotice from './CartNotice';
 import WishlistDrawer from './WishlistDrawer';
 import LoginModal from './LoginModal';
+import MetaPixel from './MetaPixel';
 
 export default function SiteChrome({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -20,6 +21,7 @@ export default function SiteChrome({ children }: { children: ReactNode }) {
 
   return (
     <>
+      <MetaPixel />
       <Header />
       {children}
       <Footer />

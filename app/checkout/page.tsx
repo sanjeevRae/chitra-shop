@@ -1,11 +1,13 @@
 'use client';
 
-import { type FormEvent, useState } from 'react';
+import { type FormEvent, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useStore } from '@/lib/store';
 import { useCustomerAuth } from '@/lib/customer-context';
 import { getProductWithPlaceholder } from '@/lib/products';
+import { PIXEL_CURRENCY, trackMetaEvent } from '@/lib/meta-pixel';
+import { rememberPurchase, type PendingPurchase } from '@/lib/meta-purchase';
 
 const TAXES = 20.0;
 const SHIPPING = 5.99;
@@ -24,6 +26,29 @@ export default function CheckoutPage() {
 
   const itemCount = cart.reduce((sum, item) => sum + item.qty, 0);
   const total = cartSubtotal + TAXES + SHIPPING - DISCOUNT;
+
+  // Meta InitiateCheckout: fires once per visit when the cart is non-empty
+  // (the cart hydrates from localStorage async, so this waits for it). Gated
+  // on login would under-report; checkout beginning = cart review here.
+  const initiatedRef = useRef(false);
+  useEffect(() => {
+    if (initiatedRef.current || cart.length === 0) return;
+    initiatedRef.current = true;
+    const contents = cart.flatMap((line) => {
+      const product = getProductWithPlaceholder(line.id);
+      if (!product) return [];
+      return [{ id: String(line.id), quantity: line.qty, item_price: product.price }];
+    });
+    if (contents.length === 0) return;
+    trackMetaEvent('InitiateCheckout', {
+      content_ids: contents.map((item) => item.id),
+      content_type: 'product',
+      contents,
+      num_items: itemCount,
+      value: Math.round(total * 100) / 100,
+      currency: PIXEL_CURRENCY,
+    });
+  }, [cart, itemCount, total]);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -82,6 +107,40 @@ export default function CheckoutPage() {
       if (!response.ok) {
         setCheckoutError(data.error || 'Could not place your order. Please try again.');
         return;
+      }
+      // Backend confirmed the order (HTTP ok + persisted row). Fire
+      // AddPaymentInfo for the submitted COD payment, then stash the
+      // backend-computed order so /thank-you can fire Purchase (deduped).
+      const order = (data.order ?? {}) as {
+        id?: unknown;
+        total?: unknown;
+        items?: { id?: unknown; price?: unknown; quantity?: unknown }[];
+      };
+      const confirmedItems = Array.isArray(order.items) ? order.items : [];
+      const purchaseContents = confirmedItems.map((item) => ({
+        id: String(item.id ?? ''),
+        quantity: Math.max(1, Math.floor(Number(item.quantity ?? 1)) || 1),
+        item_price: Number(item.price ?? 0) || 0,
+      }));
+      const orderId = String(order.id ?? '');
+      const orderTotal = Number(order.total ?? 0) || 0;
+      if (orderId) {
+        trackMetaEvent('AddPaymentInfo', {
+          content_ids: purchaseContents.map((item) => item.id),
+          content_type: 'product',
+          contents: purchaseContents,
+          num_items: purchaseContents.reduce((sum, item) => sum + item.quantity, 0),
+          value: orderTotal,
+          currency: PIXEL_CURRENCY,
+          payment_type: 'Cash on Delivery',
+        });
+        const pending: PendingPurchase = {
+          orderId,
+          total: orderTotal,
+          contents: purchaseContents,
+          numItems: purchaseContents.reduce((sum, item) => sum + item.quantity, 0),
+        };
+        rememberPurchase(pending);
       }
       clearCart();
       router.push('/thank-you');

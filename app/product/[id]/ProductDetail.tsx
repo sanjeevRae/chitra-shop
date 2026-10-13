@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Product } from '@/lib/products';
+import { PIXEL_CURRENCY, trackMetaEvent } from '@/lib/meta-pixel';
 import { useStore } from '@/lib/store';
 import ProductPrice from '@/components/ProductPrice';
 
@@ -101,6 +102,24 @@ export default function ProductDetail({ product }: { product: Product }) {
   const [tab, setTab] = useState<TabId>('spec');
   const [colorIdx, setColorIdx] = useState(0);
   const [sizeIdx, setSizeIdx] = useState(0);
+
+  // Meta ViewContent: fires once per viewed product (keyed by product id so
+  // StrictMode double-invoke and re-renders never double-count). No PII.
+  const viewedProductRef = useRef<string>('');
+  useEffect(() => {
+    const id = String(product?.id ?? '');
+    if (!id || viewedProductRef.current === id) return;
+    viewedProductRef.current = id;
+    const price = Number(product.price ?? 0) || 0;
+    trackMetaEvent('ViewContent', {
+      content_ids: [id],
+      content_type: 'product',
+      content_name: product.name,
+      contents: [{ id, quantity: 1, item_price: price }],
+      value: price,
+      currency: PIXEL_CURRENCY,
+    });
+  }, [product]);
 
   // Desktop zoom magnifier (Amazon-style). The lens and preview panel are
   // static markup mutated directly through refs on mousemove — no React

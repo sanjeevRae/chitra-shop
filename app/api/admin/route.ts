@@ -465,6 +465,25 @@ export async function GET(request: Request) {
       return NextResponse.json({ orders: (data as OrderRow[]).map(orderToAdmin) });
     }
 
+    if (action === 'tracking') {
+      // Meta Pixel settings (admin-only read of the shared `settings` row).
+      // Public browsers instead use the whitelisted
+      // GET /api/storefront?action=tracking endpoint.
+      const { data, error } = await supabase
+        .from('cms_items')
+        .select('data,updated_at')
+        .eq('path', 'settings')
+        .eq('item_id', 'meta-pixel')
+        .maybeSingle();
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      const record = ((data as { data?: unknown } | null)?.data ?? {}) as Record<string, unknown>;
+      return NextResponse.json({
+        pixelId: String(record.pixelId ?? '').trim(),
+        enabled: record.enabled === true,
+        updatedAt: (data as { updated_at?: string } | null)?.updated_at ?? null,
+      });
+    }
+
     if (action === 'cms') {
       const path = searchParams.get('path');
       if (!path) return NextResponse.json({ error: 'Missing cms path.' }, { status: 400 });
@@ -640,6 +659,27 @@ export async function PUT(request: Request) {
   try {
     const supabase = getSupabaseAdmin();
     const body = await request.json();
+
+    if (action === 'tracking') {
+      // Meta Pixel settings save (admin-only). Validates before upserting the
+      // shared `settings` / `meta-pixel` row. A future Conversions API token
+      // must never be written to this row — it stays server-side only.
+      const record = (body ?? {}) as Record<string, unknown>;
+      const pixelId = String(record.pixelId ?? '').trim();
+      const enabled = record.enabled === true;
+      if (pixelId && !/^\d{6,20}$/.test(pixelId)) {
+        return NextResponse.json({ error: 'Enter a valid Meta Pixel ID (digits only).' }, { status: 400 });
+      }
+      if (enabled && !/^\d{6,20}$/.test(pixelId)) {
+        return NextResponse.json({ error: 'Add your Pixel ID before enabling tracking.' }, { status: 400 });
+      }
+      const { error } = await supabase.from('cms_items').upsert(
+        { path: 'settings', item_id: 'meta-pixel', data: { pixelId, enabled }, updated_at: new Date().toISOString() },
+        { onConflict: 'path,item_id' },
+      );
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ ok: true, pixelId, enabled });
+    }
 
     if (action === 'products') {
       const product = body as Product;

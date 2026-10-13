@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from 'react';
 import { getProduct, type ProductId } from './products';
+import { PIXEL_CURRENCY, trackMetaEvent } from './meta-pixel';
 
 export interface CartLine {
   id: ProductId;
@@ -323,6 +324,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const key = String(id);
       const live = cartProducts[key];
       const product = getProduct(id);
+      // Meta AddToCart: the line is added above, so this event only fires on
+      // actual success (never on a failed/cancelled add). No PII is sent.
+      const itemPrice = Number(live?.price ?? product?.price ?? 0) || 0;
+      trackMetaEvent('AddToCart', {
+        content_ids: [key],
+        content_type: 'product',
+        content_name: live?.name ?? product?.name ?? 'Product',
+        contents: [{ id: key, quantity: qty, item_price: itemPrice }],
+        value: itemPrice * qty,
+        currency: PIXEL_CURRENCY,
+      });
       if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
       setCartNotice({
         id: Date.now(),

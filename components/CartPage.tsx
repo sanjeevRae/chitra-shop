@@ -6,6 +6,8 @@ import { MapPin, Minus, Plus, ShieldCheck, Trash2 } from 'lucide-react';
 import { useStore } from '../lib/store';
 import { useCustomerAuth } from '../lib/customer-context';
 import { getProduct } from '../lib/products';
+import { PIXEL_CURRENCY, trackMetaEvent } from '../lib/meta-pixel';
+import { firePendingPurchase, rememberPurchase } from '../lib/meta-purchase';
 
 // Full-page cart + COD checkout, ported from SAUD views/Cart.tsx onto
 // Chitra's own plumbing: useStore cart lines (localStorage), the session-
@@ -116,6 +118,24 @@ export default function CartPage() {
       return;
     }
     if (!cart.length) return;
+    // Meta InitiateCheckout: validation above passed, so the customer is
+    // genuinely beginning checkout (never on a failed attempt).
+    const contents = cart.flatMap((line) => {
+      const product = resolveProduct(line.id);
+      if (!product) return [];
+      const itemPrice = Number(product.price ?? 0) || 0;
+      return [{ id: String(line.id), quantity: line.qty, item_price: itemPrice }];
+    });
+    if (contents.length > 0) {
+      trackMetaEvent('InitiateCheckout', {
+        content_ids: contents.map((item) => item.id),
+        content_type: 'product',
+        contents,
+        num_items: totalItems,
+        value: Math.round(cartSubtotal * 100) / 100,
+        currency: PIXEL_CURRENCY,
+      });
+    }
     setStep('checkout');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -167,6 +187,39 @@ export default function CartPage() {
       if (!response.ok) {
         setFormError(data.error || 'Could not place your order. Please try again.');
         return;
+      }
+      // Backend confirmed the order: record COD payment info, then fire
+      // Purchase for the inline order confirmation (deduped by order id, so a
+      // later visit to /thank-you never double-counts the same order).
+      const confirmed = (data.order ?? {}) as {
+        id?: unknown;
+        total?: unknown;
+        items?: { id?: unknown; price?: unknown; quantity?: unknown }[];
+      };
+      const orderId = String(confirmed.id ?? '');
+      const orderTotal = Number(confirmed.total ?? 0) || 0;
+      const purchaseContents = (Array.isArray(confirmed.items) ? confirmed.items : []).map((item) => ({
+        id: String(item.id ?? ''),
+        quantity: Math.max(1, Math.floor(Number(item.quantity ?? 1)) || 1),
+        item_price: Number(item.price ?? 0) || 0,
+      }));
+      if (orderId) {
+        trackMetaEvent('AddPaymentInfo', {
+          content_ids: purchaseContents.map((item) => item.id),
+          content_type: 'product',
+          contents: purchaseContents,
+          num_items: purchaseContents.reduce((sum, item) => sum + item.quantity, 0),
+          value: orderTotal,
+          currency: PIXEL_CURRENCY,
+          payment_type: 'Cash on Delivery',
+        });
+        rememberPurchase({
+          orderId,
+          total: orderTotal,
+          contents: purchaseContents,
+          numItems: purchaseContents.reduce((sum, item) => sum + item.quantity, 0),
+        });
+        void firePendingPurchase();
       }
       setPlacedOrder(data.order as PlacedOrder);
       setStep('cart');

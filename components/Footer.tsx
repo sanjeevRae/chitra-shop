@@ -1,5 +1,7 @@
 'use client';
 
+import { trackMetaEvent } from '../lib/meta-pixel';
+
 export default function Footer() {
   return (
 <footer>
@@ -243,7 +245,11 @@ export default function Footer() {
           <p className="text-xs text-gray-700">
             8:30 AM - 10:30 PM
           </p>
-          <button className="text-sm font-semibold text-gray-800">
+          <button
+            type="button"
+            onClick={() => trackMetaEvent('Contact', { content_category: 'phone' })}
+            className="text-sm font-semibold text-gray-800"
+          >
             +977-9712039906/ 9712039923
           </button>
         </div>

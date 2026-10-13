@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import PurchaseTracker from "../../components/PurchaseTracker";
 
 export const metadata: Metadata = {
   title: "Thank You for Your Order | TechSelf",
@@ -7,6 +8,7 @@ export const metadata: Metadata = {
 export default function ThankYouPage() {
   return (
     <main>
+      <PurchaseTracker />
       <section className="lg:pt-20 pt-14 pb-20">
         <div className="max-w-2xl mx-auto px-4 lg:px-6 text-center">
           <div className="mb-8">

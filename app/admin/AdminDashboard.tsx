@@ -5,8 +5,9 @@ import InsightDashboard from '@/components/admin/InsightDashboard';
 import ProductDashboard from '@/components/admin/ProductDashboard';
 import ProductAdmin from '@/components/admin/ProductAdmin';
 import CmsAdmin from '@/components/admin/CmsAdmin';
+import TrackingSettings from '@/components/admin/TrackingSettings';
 
-type TabKey = 'overview' | 'products' | 'inventory' | 'cms' | 'policies';
+type TabKey = 'overview' | 'products' | 'inventory' | 'cms' | 'policies' | 'tracking';
 
 const tabs: { key: TabKey; label: string }[] = [
   { key: 'overview', label: 'Overview' },
@@ -14,6 +15,7 @@ const tabs: { key: TabKey; label: string }[] = [
   { key: 'inventory', label: 'Manage products' },
   { key: 'cms', label: 'Content (CMS)' },
   { key: 'policies', label: 'Policies' },
+  { key: 'tracking', label: 'Meta Ads / Tracking' },
 ];
 
 type Admin = { id: string; name: string; email: string };
@@ -112,6 +114,7 @@ export default function AdminDashboard({ initialAdmin }: { initialAdmin: Admin }
           {active === 'inventory' && <ProductAdmin token={token} />}
           {active === 'cms' && <CmsAdmin token={token} />}
           {active === 'policies' && <CmsAdmin token={token} initialSection="policies" />}
+          {active === 'tracking' && <TrackingSettings token={token} />}
         </div>
       </div>
     </div>

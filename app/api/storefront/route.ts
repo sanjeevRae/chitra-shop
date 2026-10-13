@@ -10,7 +10,20 @@ const ALLOWED_PATHS = new Set([
   'herobanners',
 ]);
 
-const SUPPORTED_ACTIONS = new Set(['notice', 'categories', 'collections', 'featured', 'hero', 'herobanners', 'product', 'products']);
+const SUPPORTED_ACTIONS = new Set(['notice', 'categories', 'collections', 'featured', 'hero', 'herobanners', 'product', 'products', 'tracking']);
+
+// Reads the Meta Pixel row the admin dashboard owns: cms_items at
+// path='settings' / item_id='meta-pixel', data = { pixelId, enabled }.
+// Only these two public-safe fields are ever returned — nothing secret can
+// leak through this endpoint (a future Conversions API token must never be
+// stored in this row; it stays server-side only).
+function toTrackingConfig(data: unknown): { pixelId: string; enabled: boolean } {
+  const record = (data ?? {}) as Record<string, unknown>;
+  return {
+    pixelId: String(record.pixelId ?? '').trim(),
+    enabled: record.enabled === true,
+  };
+}
 
 function toProductNumber(value: unknown): number {
   const numeric = Number(value ?? 0);
@@ -125,6 +138,21 @@ export async function GET(request: Request) {
       const legacy = await supabase.from('cms_items').select('item_id,data').eq('path', legacyPath);
       if (legacy.error) return NextResponse.json({ error: legacy.error.message }, { status: 500 });
       return NextResponse.json({ items: (legacy.data ?? []).map(item => ({ id: item.item_id, ...(item.data ?? {}) })) });
+    }
+
+    // Public Meta Pixel config — no `path` required (placed before the path
+    // guard on purpose). The browser fetches this at runtime so admin changes
+    // apply on the next page load with no env edit or redeploy. Never errors:
+    // a missing row / DB failure surfaces as "tracking off".
+    if (action === 'tracking') {
+      const { data, error } = await supabase
+        .from('cms_items')
+        .select('data')
+        .eq('path', 'settings')
+        .eq('item_id', 'meta-pixel')
+        .maybeSingle();
+      if (error || !data) return NextResponse.json({ pixelId: '', enabled: false });
+      return NextResponse.json(toTrackingConfig((data as { data?: unknown }).data));
     }
 
     const path = searchParams.get('path');
