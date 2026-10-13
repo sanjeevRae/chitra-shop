@@ -40,6 +40,7 @@ export default function Header() {
   const [searching, setSearching] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const searchBoxRef = useRef<HTMLDivElement | null>(null);
+  const mobileSearchRef = useRef<HTMLDivElement | null>(null);
   const searchRequestRef = useRef(0);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
@@ -195,7 +196,10 @@ export default function Header() {
 
   useEffect(() => {
     const onPointerDown = (event: PointerEvent) => {
-      if (searchBoxRef.current && !searchBoxRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      const insideDesktop = searchBoxRef.current?.contains(target) ?? false;
+      const insideMobile = mobileSearchRef.current?.contains(target) ?? false;
+      if (!insideDesktop && !insideMobile) {
         setSearchOpen(false);
       }
     };
@@ -579,13 +583,41 @@ export default function Header() {
       </div>
      
       {/* Mobile search: full-width rounded input with attached search button. */}
-      <div className="mt-3 lg:hidden">
+      <div ref={mobileSearchRef} className="relative mt-3 lg:hidden">
         <div className="flex">
-          <input placeholder="Search products.." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} onKeyDown={handleSearchKey} className="h-11 w-full min-w-0 flex-1 rounded-l-lg border border-r-0 border-gray-300 bg-white px-4 text-base text-gray-800 placeholder:text-gray-400 focus:border-violet-300 focus:outline-0 ring-3 ring-transparent focus:ring-violet-500/30" type="text" />
+          <input placeholder="Search products.." value={searchTerm} onFocus={() => { if (suggestions.length > 0) setSearchOpen(true); }} onChange={(e) => setSearchTerm(e.target.value)} onKeyDown={handleSearchKey} className="h-11 w-full min-w-0 flex-1 rounded-l-lg border border-r-0 border-gray-300 bg-white px-4 text-base text-gray-800 placeholder:text-gray-400 focus:border-violet-300 focus:outline-0 ring-3 ring-transparent focus:ring-violet-500/30" type="text" />
           <button type="button" onClick={submitSearch} aria-label="Search" className="inline-flex h-11 w-14 shrink-0 cursor-pointer items-center justify-center rounded-r-lg bg-black text-white transition hover:bg-gray-800">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M9.4375 2.3125C13.3726 2.3125 16.5634 5.5019 16.5635 9.43652C16.5635 11.1342 15.9681 12.6921 14.9766 13.916L17.4688 16.4082C17.7609 16.7011 17.7604 17.1761 17.4678 17.4688C17.175 17.7612 16.7 17.7612 16.4072 17.4688L13.915 14.9756C12.6911 15.9656 11.1343 16.5605 9.4375 16.5605C5.50258 16.5603 2.3125 13.3711 2.3125 9.43652C2.31258 5.50205 5.50263 2.31273 9.4375 2.3125ZM9.4375 3.8125C6.33077 3.81273 3.81258 6.33076 3.8125 9.43652C3.8125 12.5424 6.33073 15.0603 9.4375 15.0605C12.5445 15.0605 15.0635 12.5425 15.0635 9.43652C15.0634 6.33062 12.5444 3.8125 9.4375 3.8125Z" fill="currentColor" /></svg>
           </button>
         </div>
+        {searchOpen && (searching || suggestions.length > 0) ? (
+          <div className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg">
+            {searching ? (
+              <p className="px-4 py-3 text-sm text-gray-500">Searching...</p>
+            ) : suggestions.length > 0 ? (
+              <ul className="max-h-80 divide-y divide-gray-100 overflow-y-auto">
+                {suggestions.map((item) => (
+                  <li key={item.id}>
+                    <a href={item.href} onClick={() => setSearchOpen(false)} className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-gray-50">
+                      {item.image ? (
+                        <img alt="" src={item.image} loading="lazy" className="h-10 w-10 rounded-md object-cover" />
+                      ) : null}
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium text-gray-900">{item.name}</span>
+                        <span className="block text-xs text-gray-500">Rs. {item.price}</span>
+                      </span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="px-4 py-3 text-sm text-gray-500">No products found</p>
+            )}
+            <button type="button" onClick={submitSearch} className="block w-full cursor-pointer border-t border-gray-100 px-4 py-2.5 text-left text-sm font-medium text-violet-600 transition-colors hover:bg-violet-50">
+              View all results
+            </button>
+          </div>
+        ) : null}
       </div>
       <div className="border-t border-gray-100 py-2.5 lg:hidden">
         
