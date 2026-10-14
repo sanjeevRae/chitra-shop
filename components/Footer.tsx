@@ -235,7 +235,7 @@ export default function Footer() {
   </div>
   <div className="max-w-7xl mx-auto px-4 xl:px-0">
     <div className="flex flex-col lg:flex-row lg:items-center divide-y lg:divide-y-0 lg:divide-x divide-gray-100">
-      <div className="flex justify-center flex-col sm:flex-row gap-3 items-center py-7 lg:pr-5 xl:pr-16">
+      <div className="flex justify-center flex-col sm:flex-row gap-3 items-center py-6 lg:py-5 lg:pr-5 xl:pr-16">
         <div className="bg-gray-100 w-10 h-10 rounded-lg inline-flex items-center justify-center text-gray-700">
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
             <path d="M20.0001 17.0518V12C20.0001 7.58174 16.4183 4 12 4C7.58174 4 4 7.58174 4 12V17.0518M19.9998 14.041V19.75C19.9998 20.5784 19.3282 21.25 18.4998 21.25H13.9998M6.50006 18.75H5.50006C4.67163 18.75 4.00006 18.0784 4.00006 17.25V13.75C4.00006 12.9216 4.67163 12.25 5.50006 12.25H6.50006C7.32849 12.25 8.00006 12.9216 8.00006 13.75V17.25C8.00006 18.0784 7.32849 18.75 6.50006 18.75ZM17.5 18.75H18.5C19.3284 18.75 20 18.0784 20 17.25V13.75C20 12.9216 19.3284 12.25 18.5 12.25H17.5C16.6716 12.25 16 12.9216 16 13.75V17.25C16 18.0784 16.6716 18.75 17.5 18.75Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -254,7 +254,7 @@ export default function Footer() {
           </button>
         </div>
       </div>
-      <div className="flex flex-col sm:flex-row items-center justify-center py-7 lg:px-5 xl:px-16 gap-3">
+      <div className="flex flex-col sm:flex-row items-center justify-center py-6 lg:py-5 lg:px-5 xl:px-16 gap-3">
         <div className="text-center sm:text-left">
           <span className="text-sm mb-1 block font-semibold text-gray-800">
             Download Now on
@@ -271,14 +271,23 @@ export default function Footer() {
           </a>
         </div>
       </div>
-      <div className="flex flex-col items-center justify-center gap-2 py-6 lg:items-start lg:py-5 lg:pl-5 xl:pl-16 lg:shrink-0">
+      <div className="flex flex-col items-center justify-center gap-3 py-6 lg:items-start lg:py-5 lg:pl-5 xl:pl-16 lg:shrink-0">
         <p className="text-gray-500 text-sm font-medium">
           We Support
         </p>
-        <div className="flex flex-nowrap items-center gap-2 pt-2 shrink-0">
-          <img alt="eSewa" className="h-4 w-16 object-contain shrink-0" src="/images/payment/esewa-logo.png" />
-          <img alt="Khalti" className="h-5 w-20 object-contain shrink-0" src="/images/payment/khalti-logo.png" />
-          <img alt="Fonepay" className="h-5 w-20 object-contain shrink-0" src="/images/payment/fonepay-logo.png" />
+        <div className="flex flex-wrap items-center justify-center gap-3 shrink-0 lg:flex-nowrap lg:justify-start">
+          <span className="flex h-7 w-20 shrink-0 items-center justify-center">
+            <img alt="eSewa" className="max-h-full max-w-full object-contain" src="/images/payment/esewa-logo.png" />
+          </span>
+          <span className="flex h-7 w-20 shrink-0 items-center justify-center">
+            <img alt="Khalti" className="max-h-full max-w-full object-contain" src="/images/payment/khalti-logo.png" />
+          </span>
+          <span className="flex h-7 w-20 shrink-0 items-center justify-center">
+            <img alt="Fonepay" className="max-h-full max-w-full object-contain" src="/images/payment/fonepay-logo.png" />
+          </span>
+          <span className="flex h-7 w-20 shrink-0 items-center justify-center">
+            <img alt="Cash on Delivery" className="max-h-full max-w-full object-contain" src="/images/payment/cod-logo.png" />
+          </span>
         </div>
       </div>
     </div>
