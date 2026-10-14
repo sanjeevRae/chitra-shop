@@ -463,8 +463,14 @@ export default function ProductDetail({ product }: { product: Product }) {
                     </div>
                     <button
                       onClick={() => {
+                        // Buy Now uses the *current* checkout process (/cart ->
+                        // CartPage checkout step): the product (+ qty) merges
+                        // into the live store cart and ?buy=now takes the
+                        // shopper straight to checkout. Nothing is hardcoded
+                        // here — prices, totals, voucher, delivery and address
+                        // all resolve live inside CartPage from the store.
                         addToCart(product.id, qty);
-                        router.push('/checkout');
+                        router.push('/cart?buy=now');
                       }}
                       className="inline-flex grow justify-center text-base leading-5 cursor-pointer focus:ring-3 focus:ring-gray-500/20 items-center bg-black transition hover:bg-gray-800 py-2.5 px-3.5 rounded-lg text-white font-medium"
                     >

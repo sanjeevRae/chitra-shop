@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { MapPin, Minus, Plus, ShieldCheck, Trash2 } from 'lucide-react';
 import { useStore } from '../lib/store';
 import { useCustomerAuth } from '../lib/customer-context';
@@ -56,7 +57,19 @@ export default function CartPage() {
     cartProductsLoading,
   } = useStore();
   const { user, openLogin, authHeaders } = useCustomerAuth();
-  const [step, setStep] = useState<'cart' | 'checkout'>('cart');
+  const router = useRouter();
+  // Buy Now intent: ProductDetail merges the product into the live store cart
+  // and navigates to /cart?buy=now. Seed the checkout step directly from the
+  // URL flag so no in-effect step transition is needed (lazy useState
+  // initializer runs once on mount). Only the *step* seed comes from the
+  // URL — prices, totals, voucher, delivery and address all resolve live
+  // from the store + DB hydration inside the normal checkout flow below.
+  const [step, setStep] = useState<'cart' | 'checkout'>(() =>
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).get('buy') === 'now'
+      ? 'checkout'
+      : 'cart',
+  );
   const [voucherCode, setVoucherCode] = useState('');
   const [appliedVoucher, setAppliedVoucher] = useState('');
   const [selectedDelivery, setSelectedDelivery] = useState(deliveryOptions[0].id);
@@ -153,6 +166,44 @@ export default function CartPage() {
     setStep('checkout');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  // Buy Now URL cleanup: the seeded checkout step above is stable from mount,
+  // but keep ?buy=now out of the address bar and history so refresh/back
+  // behave like a normal checkout visit.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (new URLSearchParams(window.location.search).get('buy') !== 'now') return;
+    router.replace('/cart');
+  }, [router]);
+
+  // Meta InitiateCheckout for the seeded Buy Now path: Buy Now lands directly
+  // on the checkout step and never passes through proceedToCheckout, so emit
+  // the same once-per-cart-composition event here when the seed is active.
+  // No hardcoded values — identity/price/qty come from the live cart lines.
+  useEffect(() => {
+    if (step !== 'checkout') return;
+    if (typeof window === 'undefined') return;
+    if (new URLSearchParams(window.location.search).get('buy') !== 'now') return;
+    if (cart.length === 0 || cartProductsLoading) return;
+    const contents = cart.flatMap((line) => {
+      const live = resolveProduct(line.id);
+      if (!live) return [];
+      return [{ id: String(line.id), quantity: line.qty, item_price: live.price }];
+    });
+    if (contents.length !== cart.length || contents.length === 0) return;
+    const signature = `buy-now:${contents.map((item) => `${item.id}x${item.quantity}`).join('|')}`;
+    if (initiatedSigRef.current === signature) return;
+    initiatedSigRef.current = signature;
+    trackMetaEvent('InitiateCheckout', {
+      content_ids: contents.map((item) => item.id),
+      content_type: 'product',
+      contents,
+      num_items: totalItems,
+      value: Math.round(cartSubtotal * 100) / 100,
+      currency: PIXEL_CURRENCY,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- resolveProduct is a render-scoped alias over cartProducts (already a dep); listing it would re-fire per render
+  }, [step, cart, cartProducts, cartProductsLoading, cartSubtotal, totalItems]);
 
   const placeOrder = async () => {
     setFormError('');
@@ -258,7 +309,7 @@ export default function CartPage() {
           </div>
           <div className="flex flex-wrap gap-3">
             <Link
-              href="/profile"
+              href="/orders"
               className="inline-flex border border-[#111] px-4 py-2 text-sm font-semibold text-[#111] transition hover:bg-[#111] hover:text-white"
             >
               Check your order status
