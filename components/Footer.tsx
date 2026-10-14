@@ -260,7 +260,7 @@ export default function Footer() {
             Download Now on
           </span>
           <p className="text-xs text-gray-700">
-            - Shop Your Favorites, Anytime        </p>
+          Shop Your Favorites, Anytime        </p>
         </div>
         <div className="flex gap-2.5">
           <a href="#" target="_blank" rel="noopener noreferrer">
