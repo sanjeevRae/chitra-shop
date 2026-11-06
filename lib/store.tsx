@@ -33,8 +33,8 @@ export interface CartProduct {
   href: string;
 }
 
-const CART_KEY = 'techself-cart';
-const WISHLIST_KEY = 'techself-wishlist';
+const CART_KEY = 'chitra-cart';
+const WISHLIST_KEY = 'chitra-wishlist';
 
 type StoredAuth = { user: { id?: string } | null; token: string | null };
 

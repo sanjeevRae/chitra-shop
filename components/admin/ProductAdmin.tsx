@@ -43,8 +43,17 @@ const CACHE_KEY = 'chitra_admin_products_v1';
 const CACHE_MAX_AGE_MS = 5 * 60 * 1000;
 
 // Module-level cache persists across component remounts (in-memory, same page session)
-let memoryCache: Product[] | null = null;
-let memoryCacheTs = 0;
+// Also attach to window to survive module re-evaluation in dev mode
+function getMemoryCache(): { items: Product[] | null; ts: number } {
+  if (typeof window !== 'undefined') {
+    if (!(window as any).__productCache) {
+      (window as any).__productCache = { items: null, ts: 0 };
+    }
+    return (window as any).__productCache;
+  }
+  // SSR fallback
+  return { items: null, ts: 0 };
+}
 
 interface ProductCache {
   items: Product[];
@@ -57,8 +66,9 @@ function money(value?: number) {
 
 function loadCached(): Product[] | null {
   // Check in-memory cache first (fastest)
-  if (memoryCache && Date.now() - memoryCacheTs < CACHE_MAX_AGE_MS) {
-    return memoryCache;
+  const mem = getMemoryCache();
+  if (mem.items && Date.now() - mem.ts < CACHE_MAX_AGE_MS) {
+    return mem.items;
   }
 
   // Fall back to localStorage
@@ -71,8 +81,9 @@ function loadCached(): Product[] | null {
       const age = Date.now() - parsed.ts;
       if (age < CACHE_MAX_AGE_MS) {
         // Populate in-memory cache
-        memoryCache = parsed.items;
-        memoryCacheTs = parsed.ts;
+        const mc = getMemoryCache();
+        mc.items = parsed.items;
+        mc.ts = parsed.ts;
         return parsed.items;
       }
     }
@@ -84,8 +95,9 @@ function loadCached(): Product[] | null {
 
 function saveCached(items: Product[]) {
   // Save to in-memory cache (always works)
-  memoryCache = items;
-  memoryCacheTs = Date.now();
+  const mc = getMemoryCache();
+  mc.items = items;
+  mc.ts = Date.now();
 
   // Also try localStorage (may fail if quota exceeded)
   if (typeof localStorage === 'undefined') return;
@@ -97,8 +109,9 @@ function saveCached(items: Product[]) {
 }
 
 function clearCached() {
-  memoryCache = null;
-  memoryCacheTs = 0;
+  const mc = getMemoryCache();
+  mc.items = null;
+  mc.ts = 0;
   if (typeof localStorage === 'undefined') return;
   try {
     localStorage.removeItem(CACHE_KEY);
@@ -120,6 +133,9 @@ export default function ProductAdmin({ token }: Props) {
   const perPage = 100;
 
   const load = useCallback(async (force = false) => {
+    // Don't fetch if no token yet
+    if (!token) return;
+
     if (!force) {
       const cached = loadCached();
       if (cached) {
@@ -151,7 +167,10 @@ export default function ProductAdmin({ token }: Props) {
       setStatus(`Loading products... ${allItems.length} loaded`);
     }
 
-    saveCached(allItems);
+    // Only cache if we got actual items
+    if (allItems.length > 0) {
+      saveCached(allItems);
+    }
 
     setItems(allItems);
     setStatus('');
