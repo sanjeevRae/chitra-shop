@@ -223,6 +223,8 @@ export default function ProductDetail({ product }: { product: Product }) {
   );
   const information = String(product.information ?? product.description ?? '').trim();
   const reviews = (product.reviews ?? []).filter(item => String(item?.text ?? '').trim());
+  const stockNum = Number(product.stock);
+  const inStock = !isNaN(stockNum) && stockNum > 0;
   const visibleTabs = TABS.filter(current => {
     if (current.id === 'spec') return specifications.length > 0;
     if (current.id === 'info') return Boolean(information);
@@ -430,67 +432,52 @@ export default function ProductDetail({ product }: { product: Product }) {
                   ) : null}
                 </div>
                 <div>
-                  {typeof product.stock === 'number' && Number.isFinite(product.stock) && product.stock > 0 ? (
-                    <p className="text-gray-900 text-base mb-6">
-                      Hurry up! Only{" "}
-                      <span className="text-red-500">
-                        ({product.stock} items)
+                  {inStock ? (
+                    <p className="text-green-700 font-medium mb-6">
+                      In Stock{" "}
+                      <span className="text-sm font-normal text-gray-500">
+                        ({product.stock} items left)
                       </span>
-                      {" "}left in stock
                     </p>
-                  ) : null}
+                  ) : (
+                    <p className="text-red-600 font-medium mb-6">
+                      Out of stock
+                    </p>
+                  )}
                   <div className="flex gap-4">
-                    <div className="flex w-[146px] divide-gray-200 divide-x h-11 rounded-lg border border-gray-200 overflow-hidden">
-                      <button
-                        onClick={() => setQty((q) => Math.max(1, q - 1))}
-                        className="w-11 h-11 flex items-center justify-center hover:bg-gray-100 transition"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20" fill="none">
-                          <path d="M5 9.25C4.59 9.25 4.25 9.59 4.25 10C4.25 10.41 4.59 10.75 5 10.75H15C15.41 10.75 15.75 10.41 15.75 10C15.75 9.59 15.41 9.25 15 9.25H5Z" fill="#6B7280" />
-                        </svg>
-                      </button>
-                      <div className="flex-1 flex items-center justify-center">
-                        {qty}
-                      </div>
-                      <button
-                        onClick={() => setQty((q) => q + 1)}
-                        className="w-11 h-11 flex items-center justify-center hover:bg-gray-100 transition"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20" fill="none">
-                          <path d="M10 4.25C10.41 4.25 10.75 4.59 10.75 5V9.25H15C15.41 9.25 15.75 9.59 15.75 10C15.75 10.41 15.41 10.75 15 10.75H10.75V15C10.75 15.41 10.41 15.75 10 15.75C9.59 15.75 9.25 15.41 9.25 15V10.75H5C4.59 10.75 4.25 10.41 4.25 10C4.25 9.59 4.59 9.25 5 9.25H9.25V5C9.25 4.59 9.59 4.25 10 4.25Z" fill="#6B7280" />
-                        </svg>
-                      </button>
+                      {inStock ? (
+                        <>
+                          <button
+                            onClick={() => {
+                              // Buy Now uses the *current* checkout process (/cart ->
+                              // CartPage checkout step): the product (+ qty) merges
+                              // into the live store cart and ?buy=now takes the
+                              // shopper straight to checkout. Nothing is hardcoded
+                              // here — prices, totals, voucher, delivery and address
+                              // all resolve live inside CartPage from the store.
+                              addToCart(product.id, qty);
+                              router.push('/cart?buy=now');
+                            }}
+                            className="inline-flex grow justify-center text-base leading-5 cursor-pointer focus:ring-3 focus:ring-gray-500/20 items-center bg-black transition hover:bg-gray-800 py-2.5 px-3.5 rounded-lg text-white font-medium"
+                          >
+                            Buy Now
+                          </button>
+                          <button
+                            onClick={() => addToCart(product.id, qty)}
+                            className="inline-flex grow justify-center text-base leading-5 cursor-pointer focus:ring-3 focus:ring-teal-500/20 items-center bg-teal-600 transition hover:bg-teal-700 py-2.5 px-3.5 rounded-lg text-white font-medium"
+                          >
+                            Add to Cart
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          disabled
+                          className="inline-flex grow justify-center text-base leading-5 items-center bg-gray-400 py-2.5 px-3.5 rounded-lg text-white font-medium cursor-not-allowed"
+                        >
+                          Out of Stock
+                        </button>
+                      )}
                     </div>
-                    <button
-                      onClick={() => {
-                        // Buy Now uses the *current* checkout process (/cart ->
-                        // CartPage checkout step): the product (+ qty) merges
-                        // into the live store cart and ?buy=now takes the
-                        // shopper straight to checkout. Nothing is hardcoded
-                        // here — prices, totals, voucher, delivery and address
-                        // all resolve live inside CartPage from the store.
-                        addToCart(product.id, qty);
-                        router.push('/cart?buy=now');
-                      }}
-                      className="inline-flex grow justify-center text-base leading-5 cursor-pointer focus:ring-3 focus:ring-gray-500/20 items-center bg-black transition hover:bg-gray-800 py-2.5 px-3.5 rounded-lg text-white font-medium"
-                    >
-                      Buy Now
-                    </button>
-                    <button
-                      onClick={() => addToCart(product.id, qty)}
-                      className="inline-flex grow justify-center text-base leading-5 cursor-pointer focus:ring-3 focus:ring-teal-500/20 items-center bg-teal-600 transition hover:bg-teal-700 py-2.5 px-3.5 rounded-lg text-white font-medium"
-                    >
-                      Add to Cart
-                    </button>
-                    <button
-                      onClick={() => toggleWishlist(product.id)}
-                      className="inline-flex text-sm justify-center leading-5 w-11 h-11 cursor-pointer focus:ring-3 items-center transition rounded-lg border font-medium bg-white border-gray-300 text-gray-800 hover:bg-gray-100 focus:ring-gray-500/20"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20" fill="none">
-                        <path d="M3.51311 4.41851C1.88463 6.04699 1.88463 8.68728 3.51311 10.3158L9.11618 15.9189C9.60433 16.4071 10.3958 16.4071 10.884 15.9189L16.487 10.3158C18.1155 8.68737 18.1155 6.04707 16.487 4.41859C14.8586 2.79011 12.2183 2.79011 10.5898 4.41859L10.0001 5.00826L9.41037 4.4185C7.78188 2.79002 5.14159 2.79002 3.51311 4.41851Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill={wishlisted ? 'currentColor' : 'none'} />
-                      </svg>
-                    </button>
-                  </div>
                   <div className="flex-col flex items-center mt-11">
                     <div className="flex flex-wrap items-center justify-center gap-4">
                       <img alt="eSewa" className="h-5 w-auto object-contain" src="/images/payment/esewa-logo.png" />

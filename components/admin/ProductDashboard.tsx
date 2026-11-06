@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
@@ -7,18 +7,92 @@ import ProductPrice from '@/components/ProductPrice';
 
 type Props = { token: string };
 
-function money(value?: number) {
-  return `Rs. ${Number(value || 0).toFixed(2)}`;
+const CACHE_KEY = 'chitra_admin_products_v1';
+const CACHE_MAX_AGE_MS = 5 * 60 * 1000;
+
+interface ProductCache {
+  items: Product[];
+  ts: number;
+}
+
+function getMemoryCache(): { items: Product[] | null; ts: number } {
+  if (typeof window !== 'undefined') {
+    if (!(window as any).__productCache) {
+      (window as any).__productCache = { items: null, ts: 0 };
+    }
+    return (window as any).__productCache;
+  }
+  return { items: null, ts: 0 };
+}
+
+function loadCached(): Product[] | null {
+  const mem = getMemoryCache();
+  if (mem.items && Date.now() - mem.ts < CACHE_MAX_AGE_MS) {
+    return mem.items;
+  }
+
+  if (typeof localStorage === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const parsed: ProductCache = JSON.parse(raw);
+    if (parsed.items && Array.isArray(parsed.items)) {
+      const age = Date.now() - parsed.ts;
+      if (age < CACHE_MAX_AGE_MS) {
+        const mc = getMemoryCache();
+        mc.items = parsed.items;
+        mc.ts = parsed.ts;
+        return parsed.items;
+      }
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function saveCached(items: Product[]) {
+  const mc = getMemoryCache();
+  mc.items = items;
+  mc.ts = Date.now();
+
+  if (typeof localStorage === 'undefined') return;
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ items, ts: Date.now() }));
+  } catch (err) {
+    console.warn('Could not cache products to localStorage:', err);
+  }
+}
+
+function clearCached() {
+  const mc = getMemoryCache();
+  mc.items = null;
+  mc.ts = 0;
+  if (typeof localStorage === 'undefined') return;
+  try {
+    localStorage.removeItem(CACHE_KEY);
+  } catch {
+    // ignore
+  }
 }
 
 export default function ProductDashboard({ token }: Props) {
   const [items, setItems] = useState<Product[]>([]);
   const [query, setQuery] = useState('');
-  const [status, setStatus] = useState('Loading products...');
+  const [status, setStatus] = useState('');
 
-  const load = useCallback(async () => {
-    // Paginated: PostgREST caps every query at 1,000 rows, so walk every
-    // page (?page=&perPage=) and merge — 8,413+ rows load fully.
+  const load = useCallback(async (force = false) => {
+    if (!token) return;
+
+    if (!force) {
+      const cached = loadCached();
+      if (cached) {
+        setItems(cached);
+        setStatus('');
+        return;
+      }
+    }
+
     setStatus('Loading products...');
     const allItems: Product[] = [];
     let page = 1;
@@ -37,12 +111,16 @@ export default function ProductDashboard({ token }: Props) {
       page += 1;
       setStatus(`Loading products... ${allItems.length} loaded`);
     }
+
+    if (allItems.length > 0) {
+      saveCached(allItems);
+    }
+
     setItems(allItems);
     setStatus('');
   }, [token]);
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- copied: initial data fetch on mount
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void load(false); }, [load]);
 
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -64,6 +142,13 @@ export default function ProductDashboard({ token }: Props) {
             <p className="mt-2 text-sm text-[#666]">Table view for image, title, category, cost, quantity, rating, and status.</p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => { clearCached(); void load(true); }}
+              className="border border-[#ded8d0] px-4 py-2 text-sm font-semibold hover:border-[#111]"
+            >
+              Refresh
+            </button>
             <Link href={`/admin?token=${encodeURIComponent(token)}`} className="border border-[#ded8d0] px-4 py-2 text-sm font-semibold hover:border-[#111]">Back to admin</Link>
             <Link href="/main-product" className="bg-[#111] px-4 py-2 text-sm font-semibold text-white">View shop</Link>
           </div>
@@ -71,8 +156,8 @@ export default function ProductDashboard({ token }: Props) {
 
         <div className="mt-6 grid gap-3 md:grid-cols-4">
           <div className="border border-[#eee8e1] bg-[#faf8f5] p-4"><p className="text-2xl font-semibold">{items.length}</p><p className="text-xs uppercase tracking-[0.14em] text-[#777]">Products</p></div>
-          <div className="border border-[#eee8e1] bg-[#faf8f5] p-4"><p className="text-2xl font-semibold">{totalStock}</p><p className="text-xs uppercase tracking-[0.14em] text-[#777]">Quantity</p></div>
-          <div className="border border-[#eee8e1] bg-[#faf8f5] p-4"><p className="text-2xl font-semibold">{money(inventoryValue)}</p><p className="text-xs uppercase tracking-[0.14em] text-[#777]">Inventory value</p></div>
+          <div className="border border-[#eee8e1] bg-[#faf8f5] p-4"><p className="text-2xl font-semibold">{totalStock}</p><p className="text-xs uppercase tracking-[0.14em] text-[#777]">Total stock</p></div>
+          <div className="border border-[#eee8e1] bg-[#faf8f5] p-4"><p className="text-2xl font-semibold">Rs. {inventoryValue.toFixed(2)}</p><p className="text-xs uppercase tracking-[0.14em] text-[#777]">Inventory value</p></div>
           <div className="border border-[#eee8e1] bg-[#faf8f5] p-4"><p className="text-2xl font-semibold">{lowStock}</p><p className="text-xs uppercase tracking-[0.14em] text-[#777]">Low stock</p></div>
         </div>
       </div>
