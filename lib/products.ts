@@ -20,6 +20,8 @@ export interface Product {
   specifications?: { label: string; value: string }[];
   information?: string;
   reviews?: { text: string; name: string; avatar?: string; rating?: number }[];
+  /** Cloudinary account that holds this product's images. */
+  cloudinary_account?: 'products_1' | 'products_2' | 'general';
 }
 
 export const products: Product[] = [

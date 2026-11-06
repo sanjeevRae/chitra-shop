@@ -37,6 +37,7 @@ type ProductRow = {
   main_image_url?: string | null;
   gallery_images_url?: string | null;
   color?: string | null;
+  cloudinary_account?: 'products_1' | 'products_2' | 'general';
   size?: string | null;
   original_price?: number | string | null;
   rating?: number | string | null;
@@ -289,6 +290,7 @@ function rowToProduct(row: ProductRow): Product {
     seoKeywords: row.seo_keywords ?? undefined,
     ogImage: row.og_image ?? undefined,
     canonicalPath: row.canonical_path ?? undefined,
+    cloudinaryAccount: row.cloudinary_account ?? undefined,
   };
 }
 
@@ -350,6 +352,7 @@ function productToRow(product: Product) {
   put('seo_keywords', product.seoKeywords);
   put('og_image', product.ogImage);
   put('canonical_path', product.canonicalPath);
+  put('cloudinary_account', product.cloudinaryAccount);
   return row;
 }
 

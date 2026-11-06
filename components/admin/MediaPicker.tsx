@@ -1,18 +1,19 @@
-﻿'use client';
+'use client';
 
 import { useRef, useState } from 'react';
-import { uploadToCloudinary } from '@/lib/cloudinary';
+import { uploadStream, destroyImage, publicIdFromUrl, type AccountName } from '@/lib/cloudinary-accounts';
 
 type MediaPickerProps = {
   label: string;
   value?: string;
   folder: string;
+  account?: AccountName;
   helper?: string;
   onChange: (url: string) => void;
   onUploaded?: (url: string) => void;
 };
 
-export default function MediaPicker({ label, value = '', folder, helper, onChange, onUploaded }: MediaPickerProps) {
+export default function MediaPicker({ label, value = '', folder, account = 'general', helper, onChange, onUploaded }: MediaPickerProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -23,9 +24,18 @@ export default function MediaPicker({ label, value = '', folder, helper, onChang
     setUploading(true);
     setError('');
     try {
-      const result = await uploadToCloudinary(file, folder);
-      onChange(result.secureUrl);
-      onUploaded?.(result.secureUrl);
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('account', account);
+      formData.append('folder', folder);
+      const res = await fetch('/api/cloudinary?action=upload', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed.');
+      onChange(data.result.secureUrl);
+      onUploaded?.(data.result.secureUrl);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed.');
     } finally {

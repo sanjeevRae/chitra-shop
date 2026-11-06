@@ -26,6 +26,7 @@ export type Product = {
   seoKeywords?: string[];
   ogImage?: string;
   canonicalPath?: string;
+  cloudinaryAccount?: 'products_1' | 'products_2' | 'general';
 };
 
 export type Collection = {

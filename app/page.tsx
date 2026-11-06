@@ -206,7 +206,7 @@ function pickFlashSell(items: FeaturedItem[]): { id: string; name: string; price
     });
 }
 
-const HOT_DEAL_TONES = ['bg-pink-500/10', 'bg-blue-500/10', 'bg-yellow-500/10'];
+const HOT_DEAL_TONES = ['bg-[#EAF1F1]', 'bg-blue-500/10', 'bg-yellow-500/10'];
 
 function pickHotDeals(items: CollectionItem[]): HotDeal[] {
   return items
