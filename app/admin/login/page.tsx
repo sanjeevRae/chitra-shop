@@ -2,7 +2,6 @@
 
 import { Suspense, useEffect, useState, type FormEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { TOKEN_KEY } from '../AdminDashboard';
 
 function LoginForm() {
   const router = useRouter();
@@ -14,17 +13,12 @@ function LoginForm() {
   const [busy, setBusy] = useState(false);
 
   // Already holding a valid session? Skip straight to the dashboard.
+  // The HttpOnly cookie is sent automatically via credentials: 'include';
+  // the server gate at /admin verifies it.
   useEffect(() => {
-    let stored = '';
-    try {
-      stored = window.localStorage.getItem(TOKEN_KEY) ?? '';
-    } catch {
-      return;
-    }
-    if (!stored) return;
     fetch('/api/admin?action=me', {
       method: 'POST',
-      headers: { Authorization: `Bearer ${stored}` },
+      credentials: 'include',
     })
       .then(response => (response.ok ? response.json() : null))
       .then(data => {
@@ -42,18 +36,14 @@ function LoginForm() {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ email, password }),
+        credentials: 'include',
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.token) {
         setFormError(data.error || 'Login failed.');
         return;
       }
-      try {
-        window.localStorage.setItem(TOKEN_KEY, data.token);
-      } catch {
-        /* storage unavailable */
-      }
-      // Full reload: the server gate reads the fresh HttpOnly cookie + role.
+      // Token is set as HttpOnly cookie by the server; no client-side storage.
       window.location.replace('/admin');
     } finally {
       setBusy(false);

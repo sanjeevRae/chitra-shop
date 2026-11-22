@@ -5,7 +5,7 @@ import Link from 'next/link';
 import type { Product } from '@/data/products';
 import MediaPicker from './MediaPicker';
 
-type Props = { token: string };
+type Props = {};
 type Tab = 'list' | 'edit';
 
 const EMPTY_PRODUCT: Product = {
@@ -120,7 +120,7 @@ function clearCached() {
   }
 }
 
-export default function ProductAdmin({ token }: Props) {
+export default function ProductAdmin() {
   const [tab, setTab] = useState<Tab>('list');
   const [items, setItems] = useState<Product[]>([]);
   const [query, setQuery] = useState('');
@@ -133,8 +133,6 @@ export default function ProductAdmin({ token }: Props) {
   const perPage = 100;
 
   const load = useCallback(async (force = false) => {
-    // Don't fetch if no token yet
-    if (!token) return;
 
     if (!force) {
       const cached = loadCached();
@@ -151,7 +149,7 @@ export default function ProductAdmin({ token }: Props) {
     for (let guard = 0; guard < 50; guard += 1) {
       const response = await fetch(
         `/api/admin?action=products&page=${currentPage}&perPage=${perPage}`,
-        { headers: { 'x-admin-token': token } },
+        { credentials: 'include' },
       );
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
@@ -174,7 +172,7 @@ export default function ProductAdmin({ token }: Props) {
 
     setItems(allItems);
     setStatus('');
-  }, [token, perPage]);
+  }, [perPage]);
 
   useEffect(() => { void load(false); }, [load]);
 
@@ -250,8 +248,9 @@ export default function ProductAdmin({ token }: Props) {
     try {
       const response = await fetch('/api/admin?action=products', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-admin-token': token },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
+        credentials: 'include',
       });
       const data = await response.json();
       if (!response.ok) {
@@ -268,14 +267,14 @@ export default function ProductAdmin({ token }: Props) {
       setStatus(err instanceof Error ? err.message : 'Save failed.');
       setBusy(false);
     }
-  }, [form, token, load]);
+  }, [form, load]);
 
   const deleteProduct = useCallback(async (id: string) => {
     setBusy(true);
     try {
       const response = await fetch(`/api/admin?action=products&id=${encodeURIComponent(id)}`, {
         method: 'DELETE',
-        headers: { 'x-admin-token': token },
+        credentials: 'include',
       });
       const data = await response.json();
       if (!response.ok) {
@@ -290,7 +289,7 @@ export default function ProductAdmin({ token }: Props) {
       setStatus(err instanceof Error ? err.message : 'Delete failed.');
       setBusy(false);
     }
-  }, [token, load, editing, closeEditor]);
+  }, [load, editing, closeEditor]);
 
   return (
     <section className="border border-[#e0dbd4] bg-white shadow-[0_18px_50px_rgba(0,0,0,0.06)]">

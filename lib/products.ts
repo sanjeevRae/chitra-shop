@@ -1,3 +1,16 @@
+// ⚠️ PLACEHOLDER / MOCK DATA ONLY — NOT FOR PRODUCTION USE ⚠️
+//
+// This file contains a hardcoded static product catalog with fake prices.
+// It is kept ONLY as placeholder data for UI development.
+//
+// REAL product data, prices, and stock come from the public.product table in
+// Supabase via /api/shop/products and are resolved server-side in checkout.
+// NEVER use getProduct() or getProductWithPlaceholder() for pricing, ordering,
+// or inventory decisions — those values are not authoritative.
+//
+// To remove: delete this file and update lib/store.tsx to fetch product data
+// from /api/shop/products instead of calling getProduct().
+
 export type ProductId = string | number;
 
 export interface Product {

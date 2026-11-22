@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { revalidatePath } from 'next/cache';
 import { getSupabaseAdmin, requireAdminSession } from '@/lib/supabase';
+import { validateOrigin } from '@/lib/csrf';
 import {
   adminSessionExpiry,
   buildAdminSessionCookie,
@@ -614,6 +615,12 @@ async function adminMe(request: Request) {
 }
 
 export async function POST(request: Request) {
+  // CSRF: fail closed on missing/invalid Origin/Referer
+  const csrf = validateOrigin(request);
+  if (!csrf.ok) {
+    return NextResponse.json({ error: csrf.error }, { status: 403 });
+  }
+
   const { searchParams } = new URL(request.url);
   const action = searchParams.get('action');
 
@@ -654,6 +661,12 @@ export async function POST(request: Request) {
 }
 
 export async function PUT(request: Request) {
+  // CSRF: fail closed on missing/invalid Origin/Referer
+  const csrf = validateOrigin(request);
+  if (!csrf.ok) {
+    return NextResponse.json({ error: csrf.error }, { status: 403 });
+  }
+
   const { searchParams } = new URL(request.url);
   const action = searchParams.get('action');
   const gate = await requireAdminSession(getSupabaseAdmin(), getToken(request));
@@ -761,6 +774,12 @@ export async function PUT(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  // CSRF: fail closed on missing/invalid Origin/Referer
+  const csrf = validateOrigin(request);
+  if (!csrf.ok) {
+    return NextResponse.json({ error: csrf.error }, { status: 403 });
+  }
+
   const { searchParams } = new URL(request.url);
   const action = searchParams.get('action');
   const gate = await requireAdminSession(getSupabaseAdmin(), getToken(request));
@@ -806,6 +825,12 @@ export async function DELETE(request: Request) {
 }
 
 export async function PATCH(request: Request) {
+  // CSRF: fail closed on missing/invalid Origin/Referer
+  const csrf = validateOrigin(request);
+  if (!csrf.ok) {
+    return NextResponse.json({ error: csrf.error }, { status: 403 });
+  }
+
   const { searchParams } = new URL(request.url);
   const action = searchParams.get('action');
   const gate = await requireAdminSession(getSupabaseAdmin(), getToken(request));

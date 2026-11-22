@@ -3,10 +3,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { initMetaPixel } from '@/lib/meta-pixel';
 
-// Meta Ads / Tracking Settings — follows the CmsAdmin conventions: the
-// dashboard hydrates the token from localStorage, this component skips the
-// pre-hydration call, and all calls use the `x-admin-token` header.
-export default function TrackingSettings({ token }: { token: string }) {
+// Meta Ads / Tracking Settings — all calls use credentials: 'include' so the
+// HttpOnly session cookie is sent automatically. No token is stored client-side.
+export default function TrackingSettings() {
   const [pixelId, setPixelId] = useState('');
   const [enabled, setEnabled] = useState(false);
   const [status, setStatus] = useState('');
@@ -14,25 +13,11 @@ export default function TrackingSettings({ token }: { token: string }) {
   const [testing, setTesting] = useState(false);
   const [savedAt, setSavedAt] = useState('');
 
-  const authHeaders = useCallback(
-    () =>
-      token
-        ? { 'x-admin-token': token }
-        : ({} as Record<string, string>),
-    [token],
-  );
-
   const load = useCallback(async () => {
-    // token='' until the admin page hydrates it from localStorage — skip the
-    // pre-hydration call so we don't fire a guaranteed 401 on first paint.
-    if (!token) {
-      setStatus('Sign in to load the current tracking settings.');
-      return;
-    }
     setBusy(true);
     setStatus('Loading current tracking settings...');
     try {
-      const res = await fetch('/api/admin?action=tracking', { headers: authHeaders() });
+      const res = await fetch('/api/admin?action=tracking', { credentials: 'include' });
       const data = (await res.json().catch(() => ({}))) as {
         pixelId?: unknown;
         enabled?: unknown;
@@ -52,9 +37,9 @@ export default function TrackingSettings({ token }: { token: string }) {
     } finally {
       setBusy(false);
     }
-  }, [authHeaders, token]);
+  }, []);
 
-// eslint-disable-next-line react-hooks/set-state-in-effect -- copied: initial settings fetch once the dashboard token hydrates
+// eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void load(); }, [load]);
 
   const configured = pixelId.trim().length > 0;
@@ -80,8 +65,9 @@ export default function TrackingSettings({ token }: { token: string }) {
     try {
       const res = await fetch('/api/admin?action=tracking', {
         method: 'PUT',
-        headers: { 'content-type': 'application/json', ...authHeaders() },
+        headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ pixelId: id, enabled }),
+        credentials: 'include',
       });
       const data = (await res.json().catch(() => ({}))) as { error?: unknown; updatedAt?: unknown };
       if (!res.ok) {
@@ -226,7 +212,7 @@ export default function TrackingSettings({ token }: { token: string }) {
             <button
               type="button"
               onClick={() => void verifyDelivery()}
-              disabled={busy || testing || !token}
+              disabled={busy || testing}
               className="border border-[#ded8d0] bg-white px-6 py-2.5 text-sm font-semibold text-[#333] transition hover:border-[#111] disabled:opacity-60"
             >
               {testing ? 'Verifying…' : 'Verify storefront delivery'}

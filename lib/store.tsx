@@ -101,11 +101,10 @@ function sanitizeLines(value: unknown): CartLine[] {
   return [...merged.entries()].map(([id, qty]) => ({ id, qty }));
 }
 
-async function fetchDbCart(token: string | null): Promise<CartLine[] | null> {
-  if (!token) return null;
+async function fetchDbCart(): Promise<CartLine[] | null> {
   try {
     const res = await fetch('/api/customer?action=cart', {
-      headers: { Authorization: `Bearer ${token}` },
+      credentials: 'include',
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !Array.isArray((data as Record<string, unknown>).cart)) return null;
@@ -139,17 +138,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     } catch {
       /* storage unavailable */
     }
-    const { token } = readStoredAuth();
-    if (!token) return;
     if (cartSaveTimerRef.current) clearTimeout(cartSaveTimerRef.current);
     cartSaveTimerRef.current = setTimeout(() => {
       void fetch('/api/customer?action=cart', {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ items: lines }),
+        credentials: 'include',
       }).catch(() => undefined);
     }, 600);
   }, []);
@@ -194,8 +191,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       try {
         const storedCart = sanitizeLines(readLocalStorage<CartLine[]>(CART_KEY, []));
         const storedWishlist = readLocalStorage<ProductId[]>(WISHLIST_KEY, []);
-        const { token } = readStoredAuth();
-        const dbCart = token ? await fetchDbCart(token) : null;
+        const dbCart = await fetchDbCart();
         if (cancelled) return;
         const merged = new Map<string, number>();
         for (const line of storedCart) merged.set(String(line.id), line.qty);
@@ -221,10 +217,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // merged result back so both copies match.
   useEffect(() => {
     const onAuthChange = () => {
-      const { token } = readStoredAuth();
-      if (!token) return;
       void (async () => {
-        const dbCart = await fetchDbCart(token);
+        const dbCart = await fetchDbCart();
         if (!dbCart) return;
         setCart((prev) => {
           const merged = new Map<string, number>();

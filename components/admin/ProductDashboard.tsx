@@ -5,7 +5,7 @@ import Link from 'next/link';
 import type { Product } from '@/data/products';
 import ProductPrice from '@/components/ProductPrice';
 
-type Props = { token: string };
+type Props = {};
 
 const CACHE_KEY = 'chitra_admin_products_v1';
 const CACHE_MAX_AGE_MS = 5 * 60 * 1000;
@@ -76,13 +76,12 @@ function clearCached() {
   }
 }
 
-export default function ProductDashboard({ token }: Props) {
+export default function ProductDashboard() {
   const [items, setItems] = useState<Product[]>([]);
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('');
 
   const load = useCallback(async (force = false) => {
-    if (!token) return;
 
     if (!force) {
       const cached = loadCached();
@@ -97,7 +96,7 @@ export default function ProductDashboard({ token }: Props) {
     const allItems: Product[] = [];
     let page = 1;
     for (let guard = 0; guard < 50; guard += 1) {
-      const response = await fetch(`/api/admin?action=products&page=${page}&perPage=500`, { headers: { 'x-admin-token': token } });
+      const response = await fetch(`/api/admin?action=products&page=${page}&perPage=500`, { credentials: 'include' });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
         setStatus(data.error || 'Could not load products.');

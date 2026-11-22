@@ -11,10 +11,11 @@ import {
 } from 'react';
 
 // Chitra customer auth context (ports SAUD's CustomerAuthContext to Supabase).
-// Session tokens live in localStorage; the account snapshot is refreshed from
-// GET /api/customer?action=account&id= on mount (SAUD parity). Mutations use
-// the session token as `Authorization: Bearer <token>` so the server can
-// ownership-check orders and reviews. No passwords are ever stored client-side.
+// Session tokens are HttpOnly cookies (set by the server on login) and are sent
+// automatically via credentials: 'include' on every fetch. No tokens are stored
+// in localStorage, preventing XSS token theft. The account snapshot is refreshed
+// from GET /api/customer?action=account&id= on mount (SAUD parity).
+// No passwords are ever stored client-side.
 
 export type Customer = {
   id: string;
@@ -41,7 +42,6 @@ export type LoginPayload = {
 
 type AuthContextValue = {
   user: Customer | null;
-  sessionToken: string | null;
   isLoginOpen: boolean;
   authStatus: string;
   openLogin: () => void;
@@ -51,25 +51,15 @@ type AuthContextValue = {
   updateProfile: (profile: Partial<Customer>) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<Customer | null>;
-  authHeaders: () => Record<string, string>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 const USER_KEY = 'chitra-customer';
-const SESSION_KEY = 'chitra-customer-session';
 
 function readStoredUser(): Customer | null {
   try {
     const raw = window.localStorage.getItem(USER_KEY);
     return raw ? (JSON.parse(raw) as Customer) : null;
-  } catch {
-    return null;
-  }
-}
-
-function readStoredToken(): string | null {
-  try {
-    return window.localStorage.getItem(SESSION_KEY);
   } catch {
     return null;
   }
@@ -83,7 +73,6 @@ export function useCustomerAuth() {
 
 export function CustomerAuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<Customer | null>(null);
-  const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [authStatus, setAuthStatus] = useState('');
 
@@ -91,18 +80,13 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
     const saved = readStoredUser();
     // eslint-disable-next-line react-hooks/set-state-in-effect -- hydration-safe localStorage read (Next.js recommended pattern)
     if (saved?.id) setUser(saved);
-    const token = readStoredToken();
-    if (token) setSessionToken(token);
   }, []);
 
   const saveSession = useCallback((nextUser: Customer, token: string | null) => {
     setUser(nextUser);
     try {
       window.localStorage.setItem(USER_KEY, JSON.stringify(nextUser));
-      if (token) {
-        setSessionToken(token);
-        window.localStorage.setItem(SESSION_KEY, token);
-      }
+      // Token is HttpOnly cookie set by server; client does not store it.
       // Let the store merge the customer's DB cart on login.
       window.dispatchEvent(new Event('chitra-auth'));
     } catch {
@@ -110,17 +94,13 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const authHeaders = useCallback((): Record<string, string> => {
-    const token = sessionToken ?? readStoredToken();
-    return token ? { Authorization: `Bearer ${token}` } : {};
-  }, [sessionToken]);
-
   const refreshUser = useCallback(async () => {
     const saved = typeof window === 'undefined' ? null : readStoredUser();
     if (!saved?.id) return null;
     try {
       const response = await fetch(
         `/api/customer?action=account&id=${encodeURIComponent(saved.id)}`,
+        { credentials: 'include' },
       );
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.user) return saved;
@@ -150,13 +130,14 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify(payload),
+          credentials: 'include',
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok || !data.user) {
           setAuthStatus(data.error || 'Login failed.');
           return;
         }
-        saveSession(data.user as Customer, (data.token as string | undefined) ?? null);
+        saveSession(data.user as Customer, null);
         setAuthStatus('');
         setIsLoginOpen(false);
       } catch {
@@ -175,6 +156,7 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ email }),
+        credentials: 'include',
       });
       const data = await response.json().catch(() => ({}));
       setAuthStatus(data.error || data.message || 'Password reset is not configured yet.');
@@ -186,14 +168,11 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
   const updateProfile = useCallback(async (profile: Partial<Customer>) => {
     setAuthStatus('Saving profile...');
     try {
-      const token = typeof window === 'undefined' ? null : readStoredToken();
       const response = await fetch('/api/customer?action=account', {
         method: 'PATCH',
-        headers: {
-          'content-type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
+        headers: { 'content-type': 'application/json' },
         body: JSON.stringify(profile),
+        credentials: 'include',
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.user) {
@@ -215,20 +194,15 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     try {
-      const token = typeof window === 'undefined' ? null : readStoredToken();
-      if (token) {
-        await fetch('/api/customer?action=logout', {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
-        }).catch(() => undefined);
-      }
+      await fetch('/api/customer?action=logout', {
+        method: 'POST',
+        credentials: 'include',
+      }).catch(() => undefined);
     } finally {
       setUser(null);
-      setSessionToken(null);
       setAuthStatus('');
       try {
         window.localStorage.removeItem(USER_KEY);
-        window.localStorage.removeItem(SESSION_KEY);
       } catch {
         /* storage unavailable */
       }
@@ -240,7 +214,6 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       user,
-      sessionToken,
       isLoginOpen,
       authStatus,
       openLogin: () => setIsLoginOpen(true),
@@ -253,11 +226,9 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
       updateProfile,
       logout,
       refreshUser,
-      authHeaders,
     }),
     [
       user,
-      sessionToken,
       isLoginOpen,
       authStatus,
       login,
@@ -265,7 +236,6 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
       updateProfile,
       logout,
       refreshUser,
-      authHeaders,
     ],
   );
 

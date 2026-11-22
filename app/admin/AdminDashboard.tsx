@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import InsightDashboard from '@/components/admin/InsightDashboard';
 import ProductDashboard from '@/components/admin/ProductDashboard';
 import ProductAdmin from '@/components/admin/ProductAdmin';
@@ -20,54 +20,23 @@ const tabs: { key: TabKey; label: string }[] = [
 
 type Admin = { id: string; name: string; email: string };
 
-// Same localStorage key as before: holds the opaque session from
-// POST /api/admin?action=login (12h, server-verified against
-// public.admin_sessions + role='admin').
-export const TOKEN_KEY = 'chitra-admin-token';
-
 export default function AdminDashboard({ initialAdmin }: { initialAdmin: Admin }) {
-  const [token, setToken] = useState('');
-  // Rendered only after the /admin server gate already verified the session
-  // cookie maps to a customers row with role='admin'; identity is fixed.
   const admin = initialAdmin;
   const [active, setActive] = useState<TabKey>('overview');
   const [busy, setBusy] = useState(false);
 
-  // The /admin page server gate already role-checked this session against
-  // customers.role='admin'. This re-reads the stored token on mount so tabs
-  // keep calling /api/admin after refresh; an invalid/expired token routes
-  // back to /admin/login instead of failing silently.
-  useEffect(() => {
-    let stored = '';
-    try {
-      stored = window.localStorage.getItem(TOKEN_KEY) ?? '';
-    } catch {
-      /* storage unavailable */
-    }
-    if (!stored) {
-      window.location.replace('/admin/login?expired=1');
-      return;
-    }
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- hydration-safe localStorage read decides the dashboard token once on mount
-    setToken(stored);
-  }, []);
+  // Client-side API calls use credentials: 'include' so the HttpOnly session
+  // cookie is sent automatically. No token is stored in localStorage,
+  // preventing XSS token theft.
 
   const logout = useCallback(async () => {
     setBusy(true);
     try {
-      const stored = window.localStorage.getItem(TOKEN_KEY) ?? '';
       await fetch('/api/admin?action=logout', {
         method: 'POST',
-        headers: stored ? { Authorization: `Bearer ${stored}` } : {},
+        credentials: 'include',
       }).catch(() => null);
-    } catch {
-      /* storage unavailable */
     } finally {
-      try {
-        window.localStorage.removeItem(TOKEN_KEY);
-      } catch {
-        /* storage unavailable */
-      }
       // Server clears the HttpOnly cookie; replace so back-button can't replay.
       window.location.replace('/admin/login');
     }
@@ -109,12 +78,12 @@ export default function AdminDashboard({ initialAdmin }: { initialAdmin: Admin }
         </nav>
 
         <div className="mt-6">
-          {active === 'overview' && <InsightDashboard token={token} />}
-          {active === 'products' && <ProductDashboard token={token} />}
-          {active === 'inventory' && <ProductAdmin token={token} />}
-          {active === 'cms' && <CmsAdmin token={token} />}
-          {active === 'policies' && <CmsAdmin token={token} initialSection="policies" />}
-          {active === 'tracking' && <TrackingSettings token={token} />}
+          {active === 'overview' && <InsightDashboard />}
+          {active === 'products' && <ProductDashboard />}
+          {active === 'inventory' && <ProductAdmin />}
+          {active === 'cms' && <CmsAdmin />}
+          {active === 'policies' && <CmsAdmin initialSection="policies" />}
+          {active === 'tracking' && <TrackingSettings />}
         </div>
       </div>
     </div>

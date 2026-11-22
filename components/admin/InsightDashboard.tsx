@@ -256,7 +256,7 @@ function printOrder(order: Order) {
   return true;
 }
 
-export default function InsightDashboard({ token }: { token: string }) {
+export default function InsightDashboard() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [query, setQuery] = useState('');
   const [range, setRange] = useState<RangeKey>('today');
@@ -272,7 +272,7 @@ export default function InsightDashboard({ token }: { token: string }) {
       return;
     }
     setStatus('Loading orders...');
-    const response = await fetch('/api/admin?action=orders', { headers: { 'x-admin-token': token } });
+    const response = await fetch('/api/admin?action=orders', { credentials: 'include' });
     const data = await response.json().catch(() => ({}));
     setOrders(data.orders ?? []);
     setStatus(response.ok ? '' : data.error || 'Could not load orders.');
@@ -323,8 +323,9 @@ export default function InsightDashboard({ token }: { token: string }) {
     setStatus(`Updating ${order.id}...`);
     const response = await fetch('/api/admin?action=orders', {
       method: 'PATCH',
-      headers: { 'content-type': 'application/json', 'x-admin-token': token },
+      headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ id: order.id, status: nextStatus }),
+      credentials: 'include',
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {

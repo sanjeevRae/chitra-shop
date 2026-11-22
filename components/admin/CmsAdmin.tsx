@@ -45,7 +45,7 @@ function parseHeroSlides(value: unknown): HeroSlide[] {
 const BLANK_HERO_SLIDE: HeroSlide = { image: '', eyebrow: '', title: '', subtitle: '', buttonLabel: '', buttonHref: '/product' };
 
 
-function ProductSearchPicker({ value, token, onPick }: { value: string; token: string; onPick: (product: CatalogProduct) => void }) {
+function ProductSearchPicker({ value, onPick }: { value: string; onPick: (product: CatalogProduct) => void }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<CatalogProduct[]>([]);
   const [searching, setSearching] = useState(false);
@@ -62,7 +62,7 @@ function ProductSearchPicker({ value, token, onPick }: { value: string; token: s
       try {
         const res = await fetch(
           `/api/admin/product-lookup?search=${encodeURIComponent(term)}&limit=12`,
-          { headers: { 'x-admin-token': token } },
+          { credentials: 'include' },
         );
         const data = await res.json().catch(() => ({}));
         if (requestRef.current !== requestId) return;
@@ -236,7 +236,7 @@ function HeroSlidesEditor({ slides, folder, onChange }: { slides: HeroSlide[]; f
   );
 }
 
-export default function CmsAdmin({ token, initialSection }: { token: string; initialSection?: string }) {
+export default function CmsAdmin({ initialSection }: { initialSection?: string }) {
   const [activeKey, setActiveKey] = useState(() =>
     initialSection && configs.some(item => item.key === initialSection) ? initialSection : configs[0].key,
   );
@@ -256,7 +256,7 @@ export default function CmsAdmin({ token, initialSection }: { token: string; ini
       return;
     }
     setStatus('Loading current content...');
-    const res = await fetch(`/api/admin?action=cms&path=${encodeURIComponent(config.path)}`, { headers: { 'x-admin-token': token } });
+    const res = await fetch(`/api/admin?action=cms&path=${encodeURIComponent(config.path)}`, { credentials: 'include' });
     const data = await res.json();
     const nextItems = data.items ?? [];
     setItems(nextItems);
@@ -271,7 +271,7 @@ export default function CmsAdmin({ token, initialSection }: { token: string; ini
     const id = String(form[config.idField] || '').trim();
     if (!id) { setStatus('ID required.'); return; }
     setStatus('Saving changes...');
-    const res = await fetch('/api/admin?action=cms', { method: 'PUT', headers: { 'content-type': 'application/json', 'x-admin-token': token }, body: JSON.stringify({ path: config.path, id, data: form }) });
+    const res = await fetch('/api/admin?action=cms', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ path: config.path, id, data: form }), credentials: 'include' });
     const data = await res.json().catch(() => ({}));
     setStatus(res.ok ? (data.warning ? `Saved. Note: ${data.warning}` : 'Saved. Preview and storefront will update from Supabase.') : data.error || 'Save failed.');
     if (res.ok) await load();
@@ -280,7 +280,7 @@ export default function CmsAdmin({ token, initialSection }: { token: string; ini
   const remove = async (id: string) => {
     if (!confirm('Delete this content item?')) return;
     setStatus('Deleting...');
-    const res = await fetch(`/api/admin?action=cms&path=${encodeURIComponent(config.path)}&id=${encodeURIComponent(id)}`, { method: 'DELETE', headers: { 'x-admin-token': token } });
+    const res = await fetch(`/api/admin?action=cms&path=${encodeURIComponent(config.path)}&id=${encodeURIComponent(id)}`, { method: 'DELETE', credentials: 'include' });
     const data = await res.json().catch(() => ({}));
     setStatus(res.ok ? 'Deleted.' : data.error || 'Delete failed.');
     if (res.ok) await load();

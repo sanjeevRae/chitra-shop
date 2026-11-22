@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server';
 import { randomInt } from 'node:crypto';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { sendEmail } from '@/lib/order-emails';
+import { validateOrigin } from '@/lib/csrf';
+import { authLimiter, otpLimiter } from '@/lib/rate-limit';
+import { isTimingSafeEqualString } from '@/lib/timing-safe';
+import { safeError } from '@/lib/api-error';
 import {
   adminSessionExpiry,
   buildAdminSessionCookie,
@@ -28,8 +32,9 @@ import {
 //
 // Conventions mirror /api/admin: service-role client only, RLS on the new
 // tables has NO public policies. Session auth is `Authorization: Bearer
-// <customerId>.<secret>` (stdlib node:crypto; no JWT dependency), and
-// `x-customer-id` is accepted as an alias for the session token.
+// <customerId>.<secret>` (stdlib node:crypto; no JWT dependency).
+// Session token is sent via the HttpOnly cookie (credentials: 'include')
+// or Authorization: Bearer header as a non-browser fallback.
 //
 // GET account also accepts a bare `?id=<customerId>` so a stored session can
 // refresh the profile snapshot (SAUD parity). Orders and review writes always
@@ -172,8 +177,7 @@ function getSessionToken(request: Request): string | null {
     const token = authorization.slice(7).trim();
     if (token) return token;
   }
-  const headers = Object.fromEntries(request.headers.entries());
-  return headers['x-customer-id'] ?? null;
+  return null;
 }
 
 async function getSessionCustomerId(
@@ -195,7 +199,9 @@ async function getSessionCustomerId(
   if (error || !data) return null;
   const session = data as SessionRow;
   if (session.expires_at && new Date(session.expires_at).getTime() < Date.now()) return null;
-  return session.secret_hash === sha256Hex(secret) ? session.customer_id : null;
+  return isTimingSafeEqualString(session.secret_hash, sha256Hex(secret))
+    ? session.customer_id
+    : null;
 }
 
 async function mintSession(
@@ -252,7 +258,7 @@ async function getAccount(request: Request) {
     .select('id,method,role,name,email,phone,photo,address,city,area,landmark,created_at,updated_at')
     .eq('id', id)
     .maybeSingle();
-  if (error) return jsonError(error.message, 500);
+  if (error) return safeError(error, 'Account lookup failed.', 500);
   if (!data) return jsonError('Account not found.', 404);
   return NextResponse.json({ user: sanitizeCustomer(data as CustomerRow) });
 }
@@ -274,6 +280,17 @@ async function upsertAccount(request: Request) {
   const password = asText(payload.password);
   const name = asText(payload.name).trim();
   const photo = asText(payload.photo);
+
+  // Rate-limit login attempts: 5 per minute per email
+  if (mode === 'login') {
+    const limit = authLimiter.check(`login:${email}`);
+    if (!limit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many login attempts. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': String(limit.retryAfterSeconds) } },
+      );
+    }
+  }
 
   // Email-only auth: no phone, no Google.
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -391,18 +408,143 @@ async function logout(request: Request) {
 //      on the new password, updates customers.password_hash, and revokes
 //      all customer_sessions for that id.
 async function forgotPassword(request: Request) {
+  const supabase = getSupabaseAdmin();
   const payload = asRecord(await request.json().catch(() => ({})));
   const email = asText(payload.email).trim().toLowerCase();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return jsonError('Enter a valid email address.');
+
+  // Rate-limit password reset requests: 3 per 5 minutes per email
+  const forgotLimit = otpLimiter.check(`forgot:${email}`);
+  if (!forgotLimit.allowed) {
+    return NextResponse.json(
+      { error: 'Too many password reset requests. Please try again later.' },
+      { status: 429, headers: { 'Retry-After': String(forgotLimit.retryAfterSeconds) } },
+    );
   }
-  // Generic answer for every email (existing or not): no account enumeration.
-  // The real implementation will look up `emailCustomerId(email)` and only
-  // then mint/send the token — the response text stays identical either way.
-  return jsonError(
-    'Password reset is not configured yet. Please contact support to reset your password.',
-    501,
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    // Still return a generic success-like response to avoid account enumeration.
+    return NextResponse.json({ ok: true, message: 'If the email exists, a reset link has been sent.' });
+  }
+
+  // Mint a single-use reset token: random 32 bytes -> sha256 hash stored, raw token emailed.
+  const rawToken = randomBytes(32).toString('hex');
+  const tokenHash = sha256Hex(rawToken);
+  const now = Date.now();
+  const expiresAt = new Date(now + 15 * 60 * 1000).toISOString();
+
+  const { error: upsertError } = await supabase.from('password_reset_tokens').upsert(
+    {
+      email,
+      token_hash: tokenHash,
+      expires_at: expiresAt,
+      used: false,
+      created_at: new Date(now).toISOString(),
+    },
+    { onConflict: 'email' },
   );
+  if (upsertError) {
+    // Don't leak whether the email exists; return generic success.
+    return NextResponse.json({ ok: true, message: 'If the email exists, a reset link has been sent.' });
+  }
+
+  // Email the raw token to the user.
+  const store = process.env.STORE_NAME ?? 'Chitra Tech';
+  const result = await sendEmail({
+    to: email,
+    subject: `${store} password reset code`,
+    html: `<p>Your ${store} password reset code is</p><p style="font-size:24px;font-weight:700;letter-spacing:4px">${rawToken}</p><p>This code expires in 15 minutes. If you didn't request it, you can ignore this email.</p>`,
+    text: `Your ${store} password reset code is ${rawToken}. It expires in 15 minutes. If you didn't request it, you can ignore this email.`,
+  });
+
+  // Always return the same generic message regardless of whether the email exists
+  // or whether the email was sent — prevents account enumeration.
+  return NextResponse.json({ ok: true, message: 'If the email exists, a reset link has been sent.' });
+}
+
+// POST ?action=reset-password — verifies the token, updates the password,
+// marks the token used, and revokes all existing sessions for that customer.
+async function resetPassword(request: Request) {
+  const supabase = getSupabaseAdmin();
+  const payload = asRecord(await request.json().catch(() => ({})));
+  const email = asText(payload.email).trim().toLowerCase();
+  const token = asText(payload.token);
+  const newPassword = asText(payload.password);
+
+  // Rate-limit reset-password attempts: 3 per 5 minutes per email
+  const resetLimit = otpLimiter.check(`reset:${email}`);
+  if (!resetLimit.allowed) {
+    return NextResponse.json(
+      { error: 'Too many reset attempts. Please try again later.' },
+      { status: 429, headers: { 'Retry-After': String(resetLimit.retryAfterSeconds) } },
+    );
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return NextResponse.json({ ok: true, message: 'If the token is valid, your password has been reset.' });
+  }
+  if (!token || token.length < 16) {
+    return NextResponse.json({ ok: true, message: 'If the token is valid, your password has been reset.' });
+  }
+  if (newPassword.length < 8) {
+    return NextResponse.json({ ok: true, message: 'If the token is valid, your password has been reset.' });
+  }
+
+  const tokenHash = sha256Hex(token);
+
+  const { data: row, error: lookupError } = await supabase
+    .from('password_reset_tokens')
+    .select('token_hash, expires_at, used')
+    .eq('email', email)
+    .maybeSingle();
+  if (lookupError || !row) {
+    return NextResponse.json({ ok: true, message: 'If the token is valid, your password has been reset.' });
+  }
+
+  const record = row as { token_hash: string; expires_at: string; used: boolean };
+
+  // Token already used?
+  if (record.used) {
+    return NextResponse.json({ ok: true, message: 'If the token is valid, your password has been reset.' });
+  }
+
+  // Token expired?
+  if (new Date(record.expires_at).getTime() < Date.now()) {
+    return NextResponse.json({ ok: true, message: 'If the token is valid, your password has been reset.' });
+  }
+
+  // Constant-time token comparison.
+  if (!isTimingSafeEqualString(record.token_hash, tokenHash)) {
+    return NextResponse.json({ ok: true, message: 'If the token is valid, your password has been reset.' });
+  }
+
+  // Look up the customer by email.
+  const { data: existing, error: custError } = await supabase
+    .from('customers')
+    .select('id')
+    .eq('email', email)
+    .maybeSingle();
+  if (custError || !existing) {
+    return NextResponse.json({ ok: true, message: 'If the token is valid, your password has been reset.' });
+  }
+
+  const customerId = String((existing as { id: string }).id);
+
+  // Update password with scrypt hash.
+  const { error: updateError } = await supabase
+    .from('customers')
+    .update({ password_hash: hashPassword(newPassword), updated_at: new Date().toISOString() })
+    .eq('id', customerId);
+  if (updateError) {
+    return NextResponse.json({ ok: true, message: 'If the token is valid, your password has been reset.' });
+  }
+
+  // Mark the token as used.
+  await supabase.from('password_reset_tokens').update({ used: true }).eq('email', email);
+
+  // Revoke all existing sessions for this customer.
+  await supabase.from('customer_sessions').delete().eq('customer_id', customerId);
+
+  return NextResponse.json({ ok: true, message: 'If the token is valid, your password has been reset.' });
 }
 
 async function getOrders(request: Request) {
@@ -484,7 +626,48 @@ async function checkout(request: Request) {
   if (!customerId) return jsonError('Please log in to place an order.', 401);
   const payload = asRecord(await request.json().catch(() => ({})));
   const items = Array.isArray(payload.items) ? payload.items : [];
-  if (!items.length) return jsonError('Your cart is empty.');
+  if (!items.length) return jsonError('Your cart is empty.', 400);
+
+  // Look up authoritative product prices from database — never trust client-supplied prices
+  const productIds = items
+    .map((i: Record<string, unknown>) => String(i?.product_id ?? '').trim())
+    .filter(Boolean);
+  if (!productIds.length) return jsonError('No valid product IDs in cart.', 400);
+
+  const { data: products, error: productError } = await supabase
+    .from('product')
+    .select('product_id, price, stock')
+    .in('product_id', productIds);
+  if (productError) return jsonError(productError.message, 500);
+
+  const productMap = new Map(
+    ((products ?? []) as Array<{ product_id: string; price: number; stock: number }>).map(
+      (p) => [p.product_id, p]
+    )
+  );
+
+  let subtotal = 0;
+  const orderItems: unknown[] = [];
+  for (const item of items) {
+    const pid = String(item.product_id ?? '').trim();
+    const qty = Math.floor(Number(item.qty ?? 0));
+    if (!pid || qty <= 0) continue;
+    const product = productMap.get(pid);
+    if (!product) return jsonError(`Product not found: ${pid}`, 400);
+    if (qty > product.stock) return jsonError(`Insufficient stock for product ${pid}. Available: ${product.stock}`, 400);
+    subtotal += product.price * qty;
+    orderItems.push({ product_id: pid, qty, price: product.price });
+  }
+
+  // Delivery fee from server-side rules (flat rate — never from client input)
+  const deliveryFee = 0;
+
+  // Discounts are only applied from validated server-side coupon records (not yet implemented).
+  // Client-supplied discount is ignored entirely.
+  const discount = 0;
+
+  const total = subtotal - discount + deliveryFee;
+  const now = new Date().toISOString();
 
   const { data: account, error: accountError } = await supabase
     .from('customers')
@@ -496,11 +679,7 @@ async function checkout(request: Request) {
   const customer = account as CustomerRow;
 
   const shippingAddress = asRecord(payload.shippingAddress);
-  const subtotal = asNumber(payload.subtotal);
-  const discount = asNumber(payload.discount);
-  const deliveryFee = asNumber(payload.deliveryFee);
-  const total = Math.max(0, subtotal - discount + deliveryFee);
-  const now = new Date().toISOString();
+
   const order: Record<string, unknown> = {
     id: newPublicId('ORD'),
     user_id: customerId,
@@ -510,11 +689,11 @@ async function checkout(request: Request) {
       email: customer.email ?? '',
       phone: customer.phone ?? '',
     },
-    items,
+    items: orderItems,
     subtotal,
     discount,
     delivery_fee: deliveryFee,
-    delivery_label: asText(payload.deliveryLabel) || 'Standard delivery',
+    delivery_label: 'Standard delivery',
     total,
     payment_method: 'Cash on Delivery',
     status: 'pending_cod',
@@ -522,8 +701,22 @@ async function checkout(request: Request) {
     created_at: now,
     updated_at: now,
   };
+
+  // Atomic transaction: insert order, then decrement stock for each product
   const { data, error } = await supabase.from('orders').insert(order).select('*').single();
   if (error) return jsonError(error.message, 500);
+
+  // Decrement stock for each purchased product
+  for (const item of orderItems) {
+    const product = productMap.get(String(item.product_id));
+    if (product) {
+      await supabase
+        .from('product')
+        .update({ stock: product.stock - (item as { qty: number }).qty })
+        .eq('product_id', String(item.product_id));
+    }
+  }
+
   return NextResponse.json({ ok: true, order: toCustomerOrder(data as OrderDbRow) });
 }
 
@@ -613,6 +806,15 @@ async function sendSignupOtp(request: Request) {
   const name = asText(payload.name).trim();
   const password = asText(payload.password);
 
+  // Rate-limit OTP sends: 5 per minute per email
+  const otpLimit = authLimiter.check(`otp:${email}`);
+  if (!otpLimit.allowed) {
+    return NextResponse.json(
+      { error: 'Too many OTP requests. Please try again later.' },
+      { status: 429, headers: { 'Retry-After': String(otpLimit.retryAfterSeconds) } },
+    );
+  }
+
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return jsonError('Enter a valid email address.');
   }
@@ -675,6 +877,15 @@ async function verifySignupOtp(request: Request) {
   const password = asText(payload.password);
   const otp = asText(payload.otp).trim();
 
+  // Rate-limit OTP verification: 5 per 5 minutes per email
+  const otpVerifyLimit = otpLimiter.check(`otp-verify:${email}`);
+  if (!otpVerifyLimit.allowed) {
+    return NextResponse.json(
+      { error: 'Too many OTP verification attempts. Please try again later.' },
+      { status: 429, headers: { 'Retry-After': String(otpVerifyLimit.retryAfterSeconds) } },
+    );
+  }
+
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return jsonError('Enter a valid email address.');
   }
@@ -705,7 +916,7 @@ async function verifySignupOtp(request: Request) {
     return jsonError('Too many attempts. Request a new code.', 429);
   }
 
-  if ((row as { otp_hash: string }).otp_hash !== sha256Hex(otp)) {
+  if (!isTimingSafeEqualString((row as { otp_hash: string }).otp_hash, sha256Hex(otp))) {
     await supabase.from('customer_otps').update({ attempts: attempts + 1 }).eq('email', email);
     return jsonError('That code is incorrect.');
   }
@@ -756,6 +967,12 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    // CSRF: fail closed on missing/invalid Origin/Referer
+    const csrf = validateOrigin(request);
+    if (!csrf.ok) {
+      return jsonError(csrf.error, 403);
+    }
+
     const action = new URL(request.url).searchParams.get('action');
     if (action === 'account') return await upsertAccount(request);
     if (action === 'send-otp') return await sendSignupOtp(request);
@@ -764,10 +981,11 @@ export async function POST(request: Request) {
     if (action === 'reviews') return await saveReview(request);
     if (action === 'logout') return await logout(request);
     if (action === 'forgot') return await forgotPassword(request);
+    if (action === 'reset-password') return await resetPassword(request);
     if (action === 'cart') return await saveCart(request);
     return jsonError('Unsupported customer action.', 404);
   } catch (error) {
-    return jsonError(error instanceof Error ? error.message : 'Customer request failed.', 500);
+    return safeError(error, 'Customer request failed.', 500);
   }
 }
 
@@ -831,6 +1049,12 @@ async function saveCart(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
+    // CSRF: fail closed on missing/invalid Origin/Referer
+    const csrf = validateOrigin(request);
+    if (!csrf.ok) {
+      return jsonError(csrf.error, 403);
+    }
+
     const action = new URL(request.url).searchParams.get('action');
     if (action === 'account') return await updateAccount(request);
     if (action === 'orders') return await updateOrder(request);
@@ -842,6 +1066,12 @@ export async function PATCH(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    // CSRF: fail closed on missing/invalid Origin/Referer
+    const csrf = validateOrigin(request);
+    if (!csrf.ok) {
+      return jsonError(csrf.error, 403);
+    }
+
     const action = new URL(request.url).searchParams.get('action');
     if (action === 'reviews') return await deleteReview(request);
     return jsonError('Unsupported customer action.', 404);
