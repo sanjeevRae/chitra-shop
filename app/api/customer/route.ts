@@ -647,7 +647,7 @@ async function checkout(request: Request) {
   );
 
   let subtotal = 0;
-  const orderItems: unknown[] = [];
+  const orderItems: Array<{ product_id: string; qty: number; price: number }> = [];
   for (const item of items) {
     const pid = String(item.product_id ?? '').trim();
     const qty = Math.floor(Number(item.qty ?? 0));
