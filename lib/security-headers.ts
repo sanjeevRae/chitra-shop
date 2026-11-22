@@ -22,23 +22,23 @@ export const CSP_ENFORCE = CSP_REPORT_ONLY
   .replace('default-src', 'default-src')
   .replace(/report-only/g, '');
 
-export function buildSecurityHeaders(reportOnly = true): { source: string; headers: Record<string, string> }[] {
+export function buildSecurityHeaders(reportOnly = true): { source: string; headers: { key: string; value: string }[] }[] {
   const csp = reportOnly ? CSP_REPORT_ONLY : CSP_ENFORCE;
-  const cspHeader = reportOnly ? 'Content-Security-Policy-Report-Only' : 'Content-Security-Policy';
+  const cspHeaderName = reportOnly ? 'Content-Security-Policy-Report-Only' : 'Content-Security-Policy';
 
   return [
     {
       source: '/(.*)',
-      headers: {
-        [cspHeader]: csp,
-        'Strict-Transport-Security': 'max-age=63072000; includeSubDomains',
-        'X-Frame-Options': 'DENY',
-        'X-Content-Type-Options': 'nosniff',
-        'Referrer-Policy': 'strict-origin-when-cross-origin',
-        'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
-        'X-DNS-Prefetch-Control': 'off',
-        'X-XSS-Protection': '0',
-      },
+      headers: [
+        { key: cspHeaderName, value: csp },
+        { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains' },
+        { key: 'X-Frame-Options', value: 'DENY' },
+        { key: 'X-Content-Type-Options', value: 'nosniff' },
+        { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+        { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
+        { key: 'X-DNS-Prefetch-Control', value: 'off' },
+        { key: 'X-XSS-Protection', value: '0' },
+      ],
     },
   ];
 }
