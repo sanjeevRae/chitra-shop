@@ -81,7 +81,7 @@ const inputClass =
   'h-11 w-full border border-gray-300 bg-white px-4 text-base text-gray-800 placeholder:text-gray-400 outline-0 ring-3 ring-transparent focus:border-gray-900 focus:ring-gray-900/10';
 
 export default function OrdersPage() {
-  const { user, openLogin, authHeaders } = useCustomerAuth();
+  const { user, openLogin } = useCustomerAuth();
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
   const [ordersStatus, setOrdersStatus] = useState('');
   const [reviews, setReviews] = useState<ProductReview[]>([]);
@@ -95,10 +95,9 @@ export default function OrdersPage() {
   const loadOrdersAndReviews = useCallback(async () => {
     if (!user) return;
     setOrdersStatus('Loading your orders...');
-    const headers = authHeaders();
     const [ordersResponse, reviewsResponse] = await Promise.all([
-      fetch('/api/customer?action=orders', { headers }),
-      fetch('/api/customer?action=reviews', { headers }),
+      fetch('/api/customer?action=orders', { credentials: 'include' }),
+      fetch('/api/customer?action=reviews', { credentials: 'include' }),
     ]);
     const ordersData = await ordersResponse.json().catch(() => ({}));
     const reviewsData = await reviewsResponse.json().catch(() => ({}));
@@ -106,7 +105,7 @@ export default function OrdersPage() {
     setReviews(Array.isArray(reviewsData.reviews) ? reviewsData.reviews : []);
     setOrdersStatus(ordersResponse.ok ? '' : ordersData.error || 'Could not load orders.');
     if (!reviewsResponse.ok) setReviewStatus(reviewsData.error || 'Could not load reviews.');
-  }, [user, authHeaders]);
+  }, [user]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- session-scoped fetch on login (SAUD parity)
@@ -137,8 +136,9 @@ export default function OrdersPage() {
     setReviewStatus('Saving review...');
     const response = await fetch('/api/customer?action=reviews', {
       method: 'POST',
-      headers: { 'content-type': 'application/json', ...authHeaders() },
+      headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ productId: key, productName: item.name, rating: draft.rating, text: draft.text }),
+      credentials: 'include',
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
@@ -165,7 +165,7 @@ export default function OrdersPage() {
     setReviewStatus('Deleting review...');
     const response = await fetch(
       `/api/customer?action=reviews&productId=${encodeURIComponent(key)}`,
-      { method: 'DELETE', headers: authHeaders() },
+      { method: 'DELETE', credentials: 'include' },
     );
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
@@ -219,8 +219,9 @@ export default function OrdersPage() {
     setOrderActionStatus('Updating order details...');
     const response = await fetch('/api/customer?action=orders', {
       method: 'PATCH',
-      headers: { 'content-type': 'application/json', ...authHeaders() },
+      headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ orderId: order.id, intent: 'shipping', shippingAddress: draft }),
+      credentials: 'include',
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
@@ -237,8 +238,9 @@ export default function OrdersPage() {
     setOrderActionStatus('Cancelling order...');
     const response = await fetch('/api/customer?action=orders', {
       method: 'PATCH',
-      headers: { 'content-type': 'application/json', ...authHeaders() },
+      headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ orderId: order.id, intent: 'cancel' }),
+      credentials: 'include',
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {

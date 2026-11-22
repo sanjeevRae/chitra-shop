@@ -24,7 +24,7 @@ const ACCOUNTS: Record<AccountName, AccountConfig> = {
   },
 };
 
-function getAccount(account: AccountName): AccountConfig {
+export function getAccount(account: AccountName): AccountConfig {
   const cfg = ACCOUNTS[account];
   if (!cfg.cloudName || !cfg.apiKey || !cfg.apiSecret) {
     throw new Error(
@@ -34,7 +34,7 @@ function getAccount(account: AccountName): AccountConfig {
   return cfg;
 }
 
-function signUpload(
+export function signUpload(
   apiSecret: string,
   timestamp: number,
   folder: string,

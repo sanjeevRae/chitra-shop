@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { randomInt } from 'node:crypto';
+import { randomInt, randomBytes } from 'node:crypto';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { sendEmail } from '@/lib/order-emails';
 import { validateOrigin } from '@/lib/csrf';

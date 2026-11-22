@@ -56,7 +56,7 @@ export default function CartPage() {
     cartProducts,
     cartProductsLoading,
   } = useStore();
-  const { user, openLogin, authHeaders } = useCustomerAuth();
+  const { user, openLogin } = useCustomerAuth();
   const router = useRouter();
   // Buy Now intent: ProductDetail merges the product into the live store cart
   // and navigates to /cart?buy=now. Seed the checkout step directly from the
@@ -238,7 +238,8 @@ export default function CartPage() {
       }
       const response = await fetch('/api/customer?action=checkout', {
         method: 'POST',
-        headers: { 'content-type': 'application/json', ...authHeaders() },
+        headers: { 'content-type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           items,
           subtotal: cartSubtotal,

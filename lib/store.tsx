@@ -36,8 +36,6 @@ export interface CartProduct {
 const CART_KEY = 'chitra-cart';
 const WISHLIST_KEY = 'chitra-wishlist';
 
-type StoredAuth = { user: { id?: string } | null; token: string | null };
-
 interface StoreValue {
   cart: CartLine[];
   wishlist: ProductId[];
@@ -70,18 +68,6 @@ function readLocalStorage<T>(key: string, fallback: T): T {
     return JSON.parse(raw) as T;
   } catch {
     return fallback;
-  }
-}
-
-function readStoredAuth(): StoredAuth {
-  if (typeof window === 'undefined') return { user: null, token: null };
-  try {
-    const userRaw = window.localStorage.getItem('chitra-customer');
-    const token = window.localStorage.getItem('chitra-customer-session');
-    const user = userRaw ? (JSON.parse(userRaw) as { id?: string }) : null;
-    return { user: user?.id ? user : null, token };
-  } catch {
-    return { user: null, token: null };
   }
 }
 

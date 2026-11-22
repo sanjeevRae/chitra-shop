@@ -74,7 +74,7 @@ function ProductSearchPicker({ value, onPick }: { value: string; onPick: (produc
       }
     }, 300);
     return () => clearTimeout(timer);
-  }, [query, token]);
+  }, [query]);
 
   const selected = results.find((item) => item.id === value) ?? null;
 
@@ -249,12 +249,6 @@ export default function CmsAdmin({ initialSection }: { initialSection?: string }
   // the selected product below, so the admin never downloads the catalog.
 
   const load = useCallback(async () => {
-    // token='' until the admin page hydrates it from localStorage — skip the
-    // pre-hydration call so we don't fire a guaranteed 401 on first paint.
-    if (!token) {
-      setStatus('Enter your admin token above to load content.');
-      return;
-    }
     setStatus('Loading current content...');
     const res = await fetch(`/api/admin?action=cms&path=${encodeURIComponent(config.path)}`, { credentials: 'include' });
     const data = await res.json();
@@ -262,7 +256,7 @@ export default function CmsAdmin({ initialSection }: { initialSection?: string }
     setItems(nextItems);
     if (config.key === 'notice' && nextItems.length === 0) setForm(defaultNoticeItem());
     setStatus(res.ok ? '' : data.error || 'Could not load content.');
-  }, [config.key, config.path, token]);
+  }, [config.key, config.path]);
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- copied: resets draft when CMS section changes, then reloads
   useEffect(() => { setForm(config.newBlank()); void load(); }, [config, load]);
@@ -378,7 +372,7 @@ export default function CmsAdmin({ initialSection }: { initialSection?: string }
                     folder={`chitratech-shop/${config.key}`}
                     onChange={slides => setForm(current => ({ ...current, [field.key]: slides }))}
                   />
-                ) : field.type === 'product-select' ? ( <ProductSearchPicker value={String(form[field.key] ?? '')} token={token} onPick={(product) => { if (config.key === 'featured') { setForm({ ...form, [field.key]: product.id, id: product.id, name: product.name ?? '', image: product.image ?? '', price: typeof product.price === 'number' ? product.price : form.price, linkHref: product.id ? `/product/${product.id}` : '', enabled: true }); } else { setForm({ ...form, [field.key]: product.id }); } }} /> ) : field.type === 'list' ? (
+                ) : field.type === 'product-select' ? ( <ProductSearchPicker value={String(form[field.key] ?? '')} onPick={(product) => { if (config.key === 'featured') { setForm({ ...form, [field.key]: product.id, id: product.id, name: product.name ?? '', image: product.image ?? '', price: typeof product.price === 'number' ? product.price : form.price, linkHref: product.id ? `/product/${product.id}` : '', enabled: true }); } else { setForm({ ...form, [field.key]: product.id }); } }} /> ) : field.type === 'list' ? (
                   <input type="text" value={Array.isArray(form[field.key]) ? (form[field.key] as string[]).join(', ') : String(form[field.key] ?? '')} onChange={event => setForm({ ...form, [field.key]: event.target.value.split(',').map(item => item.trim()).filter(Boolean) })} className="border border-[#ded8d0] bg-[#fbfaf8] px-3 py-2 text-sm font-normal outline-none transition focus:border-[#111111]" />
                 ) : (
                   <input type={field.type === 'number' ? 'number' : 'text'} value={String(form[field.key] ?? '')} onChange={event => setForm({ ...form, [field.key]: field.type === 'number' ? Number(event.target.value) : event.target.value })} className="border border-[#ded8d0] bg-[#fbfaf8] px-3 py-2 text-sm font-normal outline-none transition focus:border-[#111111]" />

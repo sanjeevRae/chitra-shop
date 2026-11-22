@@ -264,19 +264,12 @@ export default function InsightDashboard() {
   const [updatingId, setUpdatingId] = useState('');
 
   const load = useCallback(async () => {
-    // The admin page hydrates the token from localStorage in an effect, so the
-    // first render has token=''. An empty x-admin-token would 401 immediately;
-    // wait for the real token (this callback re-runs when token changes).
-    if (!token) {
-      setStatus('Enter your admin token above to load live orders.');
-      return;
-    }
     setStatus('Loading orders...');
     const response = await fetch('/api/admin?action=orders', { credentials: 'include' });
     const data = await response.json().catch(() => ({}));
     setOrders(data.orders ?? []);
     setStatus(response.ok ? '' : data.error || 'Could not load orders.');
-  }, [token]);
+  }, []);
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- copied: initial data fetch on mount
   useEffect(() => { void load(); }, [load]);
@@ -353,7 +346,7 @@ export default function InsightDashboard() {
             <p className="mt-2 text-sm text-[#666]">Review checkout orders, print order details, track sales, and manage pending, delivered, returned, and cancelled orders.</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Link href={`/admin?userId=${encodeURIComponent(token)}`} className="border border-[#ded8d0] bg-white px-4 py-2 text-sm font-semibold hover:border-[#111]">Back to admin</Link>
+            <Link href="/admin" className="border border-[#ded8d0] bg-white px-4 py-2 text-sm font-semibold hover:border-[#111]">Back to admin</Link>
             <button onClick={() => void load()} className="inline-flex items-center gap-2 border border-[#ded8d0] bg-white px-4 py-2 text-sm font-semibold hover:border-[#111]"><RefreshCcw size={15} /> Refresh</button>
             <Link href="/main-product" className="bg-black px-4 py-2 text-sm font-semibold" style={{ color: '#ffffff' }}>View shop</Link>
           </div>
